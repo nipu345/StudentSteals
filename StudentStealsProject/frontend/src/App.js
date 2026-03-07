@@ -33,11 +33,7 @@ const S = {
     fontSize: "11px",
     flexShrink: 0,
   },
-  scrollArea: {
-    flex: 1,
-    overflowY: "auto",
-    scrollbarWidth: "none",
-  },
+  scrollArea: { flex: 1, overflowY: "auto", scrollbarWidth: "none" },
   card: {
     background: "#13132a",
     borderRadius: "18px",
@@ -111,11 +107,10 @@ const S = {
 };
 
 // -------------------------------------------------------------------
-// NAME PROMPT SCREEN
+// NAME PROMPT
 // -------------------------------------------------------------------
 function NamePrompt({ onDone }) {
   const [name, setName] = useState("");
-
   return (
     <div style={S.overlay}>
       <div style={{ fontSize: "40px", marginBottom: "16px" }}>🎓</div>
@@ -127,9 +122,7 @@ function NamePrompt({ onDone }) {
         Your AI-powered student money coach
       </div>
       <div style={{ width: "100%", marginBottom: "10px" }}>
-        <div style={{ color: "#ffffff88", fontSize: "11px", fontWeight: 700, letterSpacing: "1px", marginBottom: "8px" }}>
-          WHAT'S YOUR NAME?
-        </div>
+        <div style={{ color: "#ffffff88", fontSize: "11px", fontWeight: 700, letterSpacing: "1px", marginBottom: "8px" }}>WHAT'S YOUR NAME?</div>
         <input
           autoFocus
           value={name}
@@ -139,11 +132,7 @@ function NamePrompt({ onDone }) {
           style={S.input}
         />
       </div>
-      <button
-        onClick={() => name.trim() && onDone(name.trim())}
-        disabled={!name.trim()}
-        style={{ ...S.btn, opacity: name.trim() ? 1 : 0.4, marginTop: "4px" }}
-      >
+      <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} style={{ ...S.btn, opacity: name.trim() ? 1 : 0.4, marginTop: "4px" }}>
         Let's Go →
       </button>
     </div>
@@ -151,7 +140,7 @@ function NamePrompt({ onDone }) {
 }
 
 // -------------------------------------------------------------------
-// BUDGET SETUP SCREEN
+// BUDGET SETUP
 // -------------------------------------------------------------------
 function BudgetSetup({ onDone }) {
   const [rows, setRows] = useState([
@@ -161,15 +150,8 @@ function BudgetSetup({ onDone }) {
   ]);
 
   const addRow = () => setRows([...rows, { category: "", budget: "" }]);
-
-  const updateRow = (i, field, value) => {
-    const updated = [...rows];
-    updated[i][field] = value;
-    setRows(updated);
-  };
-
+  const updateRow = (i, field, value) => { const u = [...rows]; u[i][field] = value; setRows(u); };
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i));
-
   const canConfirm = rows.some((r) => r.category.trim() && parseFloat(r.budget) > 0);
 
   const confirm = () => {
@@ -183,56 +165,26 @@ function BudgetSetup({ onDone }) {
     <div style={S.overlay}>
       <div style={{ width: "100%", maxHeight: "700px", overflowY: "auto", scrollbarWidth: "none" }}>
         <div style={{ fontSize: "28px", marginBottom: "8px", textAlign: "center" }}>📊</div>
-        <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, textAlign: "center", marginBottom: "4px" }}>
-          Set Your Monthly Budget
-        </div>
-        <div style={{ color: "#ffffff55", fontSize: "11px", textAlign: "center", marginBottom: "20px" }}>
-          Add categories and how much you want to spend on each
-        </div>
+        <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, textAlign: "center", marginBottom: "4px" }}>Set Your Monthly Budget</div>
+        <div style={{ color: "#ffffff55", fontSize: "11px", textAlign: "center", marginBottom: "20px" }}>Add categories and how much you want to spend on each</div>
 
-        {/* Column headers */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px", paddingRight: "28px" }}>
           <div style={{ flex: 2, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>CATEGORY</div>
           <div style={{ flex: 1, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>BUDGET ($)</div>
         </div>
 
-        {/* Rows */}
         {rows.map((row, i) => (
           <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "center" }}>
-            <input
-              value={row.category}
-              onChange={(e) => updateRow(i, "category", e.target.value)}
-              placeholder="e.g. Food"
-              style={{ ...S.input, flex: 2 }}
-            />
-            <input
-              type="number"
-              value={row.budget}
-              onChange={(e) => updateRow(i, "budget", e.target.value)}
-              placeholder="0"
-              min="0"
-              style={{ ...S.input, flex: 1 }}
-            />
-            <button
-              onClick={() => removeRow(i)}
-              style={{ background: "none", border: "none", color: "#f87171", fontSize: "16px", cursor: "pointer", flexShrink: 0, padding: "0 2px" }}
-            >×</button>
+            <input value={row.category} onChange={(e) => updateRow(i, "category", e.target.value)} placeholder="e.g. Food" style={{ ...S.input, flex: 2 }} />
+            <input type="number" value={row.budget} onChange={(e) => updateRow(i, "budget", e.target.value)} placeholder="0" min="0" style={{ ...S.input, flex: 1 }} />
+            <button onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: "#f87171", fontSize: "16px", cursor: "pointer", flexShrink: 0, padding: "0 2px" }}>×</button>
           </div>
         ))}
 
-        {/* Add row */}
-        <button
-          onClick={addRow}
-          style={{ background: "none", border: "1px dashed #1e1e3a", borderRadius: "12px", color: "#4ade8088", fontSize: "12px", fontWeight: 700, cursor: "pointer", width: "100%", padding: "10px", fontFamily: "'Syne', sans-serif", marginBottom: "16px" }}
-        >
+        <button onClick={addRow} style={{ background: "none", border: "1px dashed #1e1e3a", borderRadius: "12px", color: "#4ade8088", fontSize: "12px", fontWeight: 700, cursor: "pointer", width: "100%", padding: "10px", fontFamily: "'Syne', sans-serif", marginBottom: "16px" }}>
           + Add Category
         </button>
-
-        <button
-          onClick={confirm}
-          disabled={!canConfirm}
-          style={{ ...S.btn, opacity: canConfirm ? 1 : 0.4, marginTop: 0 }}
-        >
+        <button onClick={confirm} disabled={!canConfirm} style={{ ...S.btn, opacity: canConfirm ? 1 : 0.4, marginTop: 0 }}>
           ✓ Confirm Budget
         </button>
       </div>
@@ -255,49 +207,290 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
   };
 
   return (
-    <div style={{
-      position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)",
-      display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "44px",
-    }}>
-      <div style={{
-        width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0",
-        padding: "24px 20px 32px", border: "1px solid #1e1e3a",
-      }}>
+    <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "44px" }}>
+      <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", border: "1px solid #1e1e3a" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
           <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Add Purchase</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff55", fontSize: "20px", cursor: "pointer" }}>×</button>
         </div>
 
         <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>CATEGORY</div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{
-            ...S.input, marginBottom: "14px", appearance: "none",
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234ade80'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\")",
-            backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
-            paddingRight: "32px", cursor: "pointer",
-          }}
-        >
+        <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...S.input, marginBottom: "14px", appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234ade80'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: "32px", cursor: "pointer" }}>
           {categories.map((c) => <option key={c} value={c} style={{ background: "#13132a" }}>{c}</option>)}
         </select>
 
         <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>AMOUNT ($)</div>
-        <input
-          autoFocus
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="0.00"
-          min="0"
-          step="0.01"
-          style={{ ...S.input, marginBottom: "18px", fontSize: "20px", fontWeight: 700 }}
-        />
-
+        <input autoFocus type="number" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="0.00" min="0" step="0.01" style={{ ...S.input, marginBottom: "18px", fontSize: "20px", fontWeight: 700 }} />
         <button onClick={submit} disabled={!amount || parseFloat(amount) <= 0} style={{ ...S.btn, marginTop: 0, opacity: amount && parseFloat(amount) > 0 ? 1 : 0.4 }}>
           Add Purchase
         </button>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+// MAP SCREEN — uses Leaflet via CDN (OpenStreetMap, free, no API key)
+// -------------------------------------------------------------------
+function MapScreen() {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | success | denied | error
+  const [coords, setCoords] = useState(null);
+
+  useEffect(() => {
+    // Inject Leaflet CSS if not already present
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    // Load Leaflet JS dynamically
+    const loadLeaflet = () => {
+      return new Promise((resolve) => {
+        if (window.L) return resolve(window.L);
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => resolve(window.L);
+        document.head.appendChild(script);
+      });
+    };
+
+    const initMap = async (lat, lng) => {
+      const L = await loadLeaflet();
+      if (!mapRef.current || mapInstanceRef.current) return;
+
+      const map = L.map(mapRef.current, {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: false,
+      });
+
+      // Dark tile layer from CartoDB
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: "© OpenStreetMap © CARTO",
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Custom green dot marker for user location
+      const greenDot = L.divIcon({
+        className: "",
+        html: `
+          <div style="
+            width: 18px; height: 18px; border-radius: 50%;
+            background: #4ade80; border: 3px solid #fff;
+            box-shadow: 0 0 0 4px rgba(74,222,128,0.3), 0 0 20px rgba(74,222,128,0.5);
+          "></div>
+        `,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      });
+
+      L.marker([lat, lng], { icon: greenDot })
+        .addTo(map)
+        .bindPopup("<b style='font-family:sans-serif'>You are here</b>")
+        .openPopup();
+
+      // Pulse ring around user
+      const pulseIcon = L.divIcon({
+        className: "",
+        html: `
+          <div style="
+            width: 60px; height: 60px; border-radius: 50%;
+            background: rgba(74,222,128,0.12);
+            border: 2px solid rgba(74,222,128,0.3);
+            margin-left: -21px; margin-top: -21px;
+          "></div>
+        `,
+        iconSize: [60, 60],
+      });
+      L.marker([lat, lng], { icon: pulseIcon, interactive: false }).addTo(map);
+
+      mapInstanceRef.current = map;
+      setStatus("success");
+      setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
+    };
+
+    if (!navigator.geolocation) {
+      setStatus("error");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
+      () => setStatus("denied")
+    );
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
+        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Nearby Map</div>
+        {coords && (
+          <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "2px", fontFamily: "monospace" }}>
+            📍 {coords.lat}, {coords.lng}
+          </div>
+        )}
+      </div>
+
+      {/* Map container */}
+      <div style={{ flex: 1, position: "relative", margin: "0 12px 12px", borderRadius: "20px", overflow: "hidden", border: "1px solid #1e1e3a" }}>
+        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+
+        {/* Loading state */}
+        {status === "loading" && (
+          <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 10 }}>
+            <div style={{ fontSize: "32px" }}>📡</div>
+            <div style={{ color: "#4ade80", fontSize: "13px", fontWeight: 700 }}>Finding your location...</div>
+            <div style={{ color: "#ffffff44", fontSize: "11px" }}>Please allow location access</div>
+          </div>
+        )}
+
+        {/* Denied state */}
+        {status === "denied" && (
+          <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "24px", zIndex: 10 }}>
+            <div style={{ fontSize: "32px" }}>📍</div>
+            <div style={{ color: "#f87171", fontSize: "13px", fontWeight: 700, textAlign: "center" }}>Location access denied</div>
+            <div style={{ color: "#ffffff44", fontSize: "11px", textAlign: "center" }}>Enable location in your browser settings to see the map</div>
+          </div>
+        )}
+
+        {/* Zoom controls */}
+        {status === "success" && mapInstanceRef.current && (
+          <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: "4px", zIndex: 1000 }}>
+            {["+", "−"].map((label, i) => (
+              <button key={i} onClick={() => i === 0 ? mapInstanceRef.current.zoomIn() : mapInstanceRef.current.zoomOut()} style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Recenter button */}
+        {status === "success" && (
+          <button
+            onClick={() => {
+              navigator.geolocation.getCurrentPosition((pos) => {
+                mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 15);
+              });
+            }}
+            style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, background: "#13132a", border: "1px solid #4ade8044", borderRadius: "10px", color: "#4ade80", fontSize: "11px", fontWeight: 700, padding: "8px 12px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}
+          >
+            ◎ Recenter
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+// PROFILE SCREEN
+// -------------------------------------------------------------------
+function ProfileScreen({ userName }) {
+  const [editingName, setEditingName] = useState(false);
+  const [displayName, setDisplayName] = useState(userName || "Student");
+  const [tempName, setTempName] = useState(userName || "Student");
+  const [notifications, setNotifications] = useState(true);
+  const [locationSharing, setLocationSharing] = useState(true);
+  const [darkMode, setDarkMode] = useState(true);
+
+  const ToggleSwitch = ({ value, onChange }) => (
+    <div onClick={() => onChange(!value)} style={{ width: "44px", height: "24px", borderRadius: "100px", background: value ? "#4ade80" : "#1e1e3a", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+      <div style={{ position: "absolute", top: "3px", left: value ? "23px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
+    </div>
+  );
+
+  const SettingRow = ({ icon, label, sublabel, children }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 0", borderBottom: "1px solid #1e1e3a" }}>
+      <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: "#fff", fontSize: "13px", fontWeight: 600 }}>{label}</div>
+        {sublabel && <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "1px" }}>{sublabel}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none" }}>
+      <div style={{ padding: "16px 20px 80px" }}>
+
+        {/* Avatar + name */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
+          <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", marginBottom: "12px", boxShadow: "0 0 0 3px #0d0d1a, 0 0 0 5px #4ade8044" }}>🎓</div>
+          {editingName ? (
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <input value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ ...S.input, width: "140px", textAlign: "center", fontSize: "16px", fontWeight: 700 }} autoFocus />
+              <button onClick={() => { setDisplayName(tempName); setEditingName(false); }} style={{ background: "#4ade80", border: "none", borderRadius: "8px", padding: "8px 12px", color: "#080810", fontWeight: 700, cursor: "pointer", fontSize: "12px", fontFamily: "'Syne', sans-serif" }}>Save</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>{displayName}</div>
+              <button onClick={() => { setTempName(displayName); setEditingName(true); }} style={{ background: "none", border: "none", color: "#4ade8088", fontSize: "12px", cursor: "pointer" }}>✏️</button>
+            </div>
+          )}
+          <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "4px", fontFamily: "monospace" }}>student@university.edu</div>
+        </div>
+
+        {/* Account section */}
+        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ACCOUNT</div>
+        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
+          <SettingRow icon="🔒" label="Change Password" sublabel="Last changed 30 days ago">
+            <div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div>
+          </SettingRow>
+          <SettingRow icon="📧" label="Change Email" sublabel="student@university.edu">
+            <div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div>
+          </SettingRow>
+          <SettingRow icon="🎓" label="University" sublabel="Not set">
+            <div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div>
+          </SettingRow>
+        </div>
+
+        {/* Preferences */}
+        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>PREFERENCES</div>
+        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
+          <SettingRow icon="🔔" label="Deal Notifications" sublabel="Get alerted on new nearby deals">
+            <ToggleSwitch value={notifications} onChange={setNotifications} />
+          </SettingRow>
+          <SettingRow icon="📍" label="Location Sharing" sublabel="Needed for nearby deals">
+            <ToggleSwitch value={locationSharing} onChange={setLocationSharing} />
+          </SettingRow>
+          <SettingRow icon="🌙" label="Dark Mode" sublabel="Always on (recommended)">
+            <ToggleSwitch value={darkMode} onChange={setDarkMode} />
+          </SettingRow>
+        </div>
+
+        {/* About */}
+        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ABOUT</div>
+        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
+          <SettingRow icon="ℹ️" label="App Version" sublabel="v1.0.0 — StudentSteals">
+            <div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700 }}>Latest</div>
+          </SettingRow>
+          <SettingRow icon="⭐" label="Rate the App" sublabel="Help us improve">
+            <div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div>
+          </SettingRow>
+          <SettingRow icon="💬" label="Send Feedback" sublabel="">
+            <div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div>
+          </SettingRow>
+        </div>
+
+        {/* Sign out */}
+        <button style={{ width: "100%", padding: "14px", borderRadius: "14px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>
+          Sign Out
+        </button>
+
       </div>
     </div>
   );
@@ -314,33 +507,20 @@ function DealsTab() {
   const [locationLabel, setLocationLabel] = useState(null);
 
   const fetchDeals = () => {
-    setLoading(true);
-    setError(null);
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported by your browser.");
-      setLoading(false);
-      return;
-    }
+    setLoading(true); setError(null);
+    if (!navigator.geolocation) { setError("Geolocation not supported."); setLoading(false); return; }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         try {
-          const res = await fetch(`${BACKEND_URL}/deals`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: latitude, lng: longitude, radius: 1500 }),
-          });
+          const res = await fetch(`${BACKEND_URL}/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat: latitude, lng: longitude, radius: 1500 }) });
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           setDeals(data.deals || []);
-        } catch (e) {
-          setError(e.message);
-        } finally {
-          setLoading(false);
-        }
+        } catch (e) { setError(e.message); } finally { setLoading(false); }
       },
-      () => { setError("Location access denied. Please allow location access."); setLoading(false); }
+      () => { setError("Location access denied."); setLoading(false); }
     );
   };
 
@@ -352,59 +532,28 @@ function DealsTab() {
   return (
     <div style={{ padding: "0 20px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-        <div style={{ color: "#ffffff44", fontSize: "11px" }}>
-          {locationLabel ? `📍 ${locationLabel}` : "📍 Locating..."}
-        </div>
+        <div style={{ color: "#ffffff44", fontSize: "11px" }}>{locationLabel ? `📍 ${locationLabel}` : "📍 Locating..."}</div>
         <button onClick={fetchDeals} style={{ background: "none", border: "none", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>↻ Refresh</button>
       </div>
 
       <div style={{ display: "flex", gap: "6px", marginBottom: "14px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "4px" }}>
-        {categories.map((c) => (
-          <button key={c} style={S.pill(filter === c)} onClick={() => setFilter(c)}>
-            {c.charAt(0).toUpperCase() + c.slice(1)}
-          </button>
-        ))}
+        {categories.map((c) => <button key={c} style={S.pill(filter === c)} onClick={() => setFilter(c)}>{c.charAt(0).toUpperCase() + c.slice(1)}</button>)}
       </div>
 
-      {loading && (
-        <div style={{ textAlign: "center", color: "#4ade80", padding: "40px 0" }}>
-          <div style={{ fontSize: "28px", marginBottom: "8px" }}>📡</div>
-          <div style={{ fontSize: "13px" }}>Finding deals near you...</div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}>
-          <div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div>
-          <button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button>
-        </div>
-      )}
-
-      {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign: "center", color: "#ffffff33", padding: "40px 0", fontSize: "13px" }}>
-          No deals found nearby.
-        </div>
-      )}
+      {loading && <div style={{ textAlign: "center", color: "#4ade80", padding: "40px 0" }}><div style={{ fontSize: "28px", marginBottom: "8px" }}>📡</div><div style={{ fontSize: "13px" }}>Finding deals near you...</div></div>}
+      {error && <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}><div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div><button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button></div>}
+      {!loading && !error && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "40px 0", fontSize: "13px" }}>No deals found nearby.</div>}
 
       {!loading && filtered.map((deal, i) => (
         <div key={deal.id || i} style={{ ...S.card, border: i < 3 ? "1px solid #4ade8022" : "1px solid #1e1e3a" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>
-              {deal.emoji}
-            </div>
+            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>{deal.name}</div>
               <div style={{ color: "#4ade8099", fontSize: "12px", marginTop: "2px" }}>{deal.deal}</div>
-              <div style={{ color: "#ffffff33", fontSize: "11px", marginTop: "3px" }}>
-                📍 {deal.distance_label} away
-                {deal.rating && ` · ⭐ ${deal.rating}`}
-                {deal.open_now === true && " · 🟢 Open"}
-                {deal.open_now === false && " · 🔴 Closed"}
-              </div>
+              <div style={{ color: "#ffffff33", fontSize: "11px", marginTop: "3px" }}>📍 {deal.distance_label} away{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · 🔴 Closed"}</div>
             </div>
-            <div style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px", flexShrink: 0 }}>
-              -{deal.saving}
-            </div>
+            <div style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px", flexShrink: 0 }}>-{deal.saving}</div>
           </div>
         </div>
       ))}
@@ -416,9 +565,7 @@ function DealsTab() {
 // AI COACH TAB
 // -------------------------------------------------------------------
 function CoachTab({ spending }) {
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hey! I'm your StudentSteals AI coach 👋 Ask me anything about saving money as a student." }
-  ]);
+  const [messages, setMessages] = useState([{ role: "assistant", text: "Hey! I'm your StudentSteals AI coach 👋 Ask me anything about saving money as a student." }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
@@ -432,44 +579,24 @@ function CoachTab({ spending }) {
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/coach`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg, spending }),
-      });
+      const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending }) });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
     } catch (e) {
       setMessages((prev) => [...prev, { role: "assistant", text: `Sorry, something went wrong: ${e.message}` }]);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const suggestions = [
-    "I have $30 left this week 😬",
-    "How do I save on textbooks?",
-    "Best cheap meals near campus?",
-    "Help me stick to my budget",
-  ];
+  const suggestions = ["I have $30 left this week 😬", "How do I save on textbooks?", "Best cheap meals near campus?", "Help me stick to my budget"];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "0 20px" }}>
       <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none", paddingBottom: "12px" }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: "10px" }}>
-            {msg.role === "assistant" && (
-              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", marginRight: "8px", flexShrink: 0, marginTop: "2px" }}>🤖</div>
-            )}
-            <div style={{
-              maxWidth: "75%",
-              background: msg.role === "user" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a",
-              color: msg.role === "user" ? "#080810" : "#e2e8f0",
-              borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-              padding: "10px 14px", fontSize: "13px", lineHeight: 1.6,
-              border: msg.role === "assistant" ? "1px solid #1e1e3a" : "none",
-            }}>
+            {msg.role === "assistant" && <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", marginRight: "8px", flexShrink: 0, marginTop: "2px" }}>🤖</div>}
+            <div style={{ maxWidth: "75%", background: msg.role === "user" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", color: msg.role === "user" ? "#080810" : "#e2e8f0", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", padding: "10px 14px", fontSize: "13px", lineHeight: 1.6, border: msg.role === "assistant" ? "1px solid #1e1e3a" : "none" }}>
               {msg.text}
             </div>
           </div>
@@ -485,20 +612,12 @@ function CoachTab({ spending }) {
 
       {messages.length === 1 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
-          {suggestions.map((s, i) => (
-            <button key={i} onClick={() => setInput(s)} style={{ ...S.pill(false), fontSize: "11px" }}>{s}</button>
-          ))}
+          {suggestions.map((s, i) => <button key={i} onClick={() => setInput(s)} style={{ ...S.pill(false), fontSize: "11px" }}>{s}</button>)}
         </div>
       )}
 
       <div style={{ display: "flex", gap: "8px", paddingBottom: "8px" }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          placeholder="Ask anything about money..."
-          style={{ flex: 1, background: "#13132a", border: "1px solid #1e1e3a", borderRadius: "14px", padding: "11px 14px", color: "#fff", fontSize: "13px", fontFamily: "'Syne', sans-serif", outline: "none" }}
-        />
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder="Ask anything about money..." style={{ flex: 1, background: "#13132a", border: "1px solid #1e1e3a", borderRadius: "14px", padding: "11px 14px", color: "#fff", fontSize: "13px", fontFamily: "'Syne', sans-serif", outline: "none" }} />
         <button onClick={sendMessage} disabled={loading} style={{ width: "44px", height: "44px", borderRadius: "14px", background: "linear-gradient(135deg, #4ade80, #22c55e)", border: "none", cursor: "pointer", fontSize: "18px", opacity: loading ? 0.5 : 1 }}>↑</button>
       </div>
     </div>
@@ -516,64 +635,33 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
   const fetchSwaps = async () => {
     setLoadingSwaps(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/swaps`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spending }),
-      });
+      const res = await fetch(`${BACKEND_URL}/swaps`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spending }) });
       const data = await res.json();
       setSwaps(data.swaps);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingSwaps(false);
-    }
+    } catch (e) { console.error(e); } finally { setLoadingSwaps(false); }
   };
 
-  // Total budget = sum of all category budgets
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
-  // Total spent = sum of all category spending
   const totalSpent = Object.values(spending).reduce((a, b) => a + b, 0);
-  // Money left
   const moneyLeft = totalBudget - totalSpent;
   const isOverall = moneyLeft < 0;
-
   const categories = Object.keys(budgets);
-
   const now = new Date();
-  const monthName = now.toLocaleString("default", { month: "long" });
-  const year = now.getFullYear();
 
   return (
     <div style={{ padding: "0 20px 20px", position: "relative" }}>
-
-      {/* Money Left banner */}
-      <div style={{
-        background: isOverall
-          ? "linear-gradient(135deg, #53131333, #7f1d1d18)"
-          : "linear-gradient(135deg, #13532d33, #15803d18)",
-        border: `1px solid ${isOverall ? "#f8717133" : "#4ade8033"}`,
-        borderRadius: "18px", padding: "16px", marginBottom: "16px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-      }}>
+      <div style={{ background: isOverall ? "linear-gradient(135deg, #53131333, #7f1d1d18)" : "linear-gradient(135deg, #13532d33, #15803d18)", border: `1px solid ${isOverall ? "#f8717133" : "#4ade8033"}`, borderRadius: "18px", padding: "16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>
-            {isOverall ? "OVER BUDGET" : "MONEY LEFT"}
-          </div>
-          <div style={{ color: isOverall ? "#f87171" : "#4ade80", fontSize: "30px", fontWeight: 700 }}>
-            {isOverall ? `-$${Math.abs(moneyLeft).toFixed(2)}` : `$${moneyLeft.toFixed(2)}`}
-          </div>
-          <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>
-            ${totalSpent.toFixed(2)} spent of ${totalBudget.toFixed(2)}
-          </div>
+          <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
+          <div style={{ color: isOverall ? "#f87171" : "#4ade80", fontSize: "30px", fontWeight: 700 }}>{isOverall ? `-$${Math.abs(moneyLeft).toFixed(2)}` : `$${moneyLeft.toFixed(2)}`}</div>
+          <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>${totalSpent.toFixed(2)} spent of ${totalBudget.toFixed(2)}</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ color: "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>THIS MONTH</div>
-          <div style={{ color: "#fff", fontSize: "13px", marginTop: "4px" }}>{monthName} {year}</div>
+          <div style={{ color: "#fff", fontSize: "13px", marginTop: "4px" }}>{now.toLocaleString("default", { month: "long" })} {now.getFullYear()}</div>
         </div>
       </div>
 
-      {/* Spending bars per category */}
       {categories.map((key) => {
         const amount = spending[key] || 0;
         const budget = budgets[key];
@@ -583,40 +671,20 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
           <div key={key} style={{ marginBottom: "14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
               <span style={{ color: "#fff", fontWeight: 600, fontSize: "13px" }}>{key}</span>
-              <span style={{ fontSize: "12px", color: over ? "#f87171" : "#ffffff66" }}>
-                ${amount.toFixed(2)} <span style={{ color: "#ffffff33" }}>/ ${budget.toFixed(2)}</span>
-              </span>
+              <span style={{ fontSize: "12px", color: over ? "#f87171" : "#ffffff66" }}>${amount.toFixed(2)} <span style={{ color: "#ffffff33" }}>/ ${budget.toFixed(2)}</span></span>
             </div>
             <div style={{ background: "#13132a", borderRadius: "100px", height: "7px" }}>
-              <div style={{
-                width: `${pct}%`, height: "100%", borderRadius: "100px",
-                background: over ? "#f87171" : pct > 80 ? "#facc15" : "#4ade80",
-                transition: "width 0.6s ease",
-              }} />
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: "100px", background: over ? "#f87171" : pct > 80 ? "#facc15" : "#4ade80", transition: "width 0.6s ease" }} />
             </div>
-            {over && (
-              <div style={{ color: "#f87171", fontSize: "10px", marginTop: "3px" }}>
-                ⚠️ ${(amount - budget).toFixed(2)} over budget
-              </div>
-            )}
+            {over && <div style={{ color: "#f87171", fontSize: "10px", marginTop: "3px" }}>⚠️ ${(amount - budget).toFixed(2)} over budget</div>}
           </div>
         );
       })}
 
-      {/* Add Purchase button */}
-      <button
-        onClick={() => setShowAddPurchase(true)}
-        style={{
-          width: "100%", padding: "12px", borderRadius: "14px", marginBottom: "10px",
-          background: "#13132a", border: "1px solid #4ade8044",
-          color: "#4ade80", fontSize: "13px", fontWeight: 700, cursor: "pointer",
-          fontFamily: "'Syne', sans-serif",
-        }}
-      >
+      <button onClick={() => setShowAddPurchase(true)} style={{ width: "100%", padding: "12px", borderRadius: "14px", marginBottom: "10px", background: "#13132a", border: "1px solid #4ade8044", color: "#4ade80", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>
         + Add Purchase
       </button>
 
-      {/* AI Swaps */}
       <button onClick={fetchSwaps} style={S.btn} disabled={loadingSwaps}>
         {loadingSwaps ? "Getting AI swaps..." : "✨ Get AI-Powered Swaps"}
       </button>
@@ -624,16 +692,8 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
       {swaps && swaps.map((swap, i) => (
         <div key={i} style={{ ...S.card, marginTop: "10px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>{swap.emoji}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-            <span style={{ background: "#ff4d4d18", color: "#f87171", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>
-              ❌ {swap.from}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-            <span style={{ background: "#4ade8018", color: "#4ade80", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>
-              ✅ {swap.to}
-            </span>
-          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}><span style={{ background: "#ff4d4d18", color: "#f87171", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>❌ {swap.from}</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}><span style={{ background: "#4ade8018", color: "#4ade80", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>✅ {swap.to}</span></div>
           <div style={{ background: "#13532d33", borderRadius: "10px", padding: "8px 12px", display: "flex", justifyContent: "space-between" }}>
             <span style={{ color: "#86efac", fontSize: "12px" }}>Save</span>
             <span style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px" }}>{swap.save}</span>
@@ -641,14 +701,7 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
         </div>
       ))}
 
-      {/* Add Purchase Modal */}
-      {showAddPurchase && (
-        <AddPurchaseModal
-          categories={categories}
-          onAdd={onAddPurchase}
-          onClose={() => setShowAddPurchase(false)}
-        />
-      )}
+      {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
     </div>
   );
 }
@@ -658,32 +711,26 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
 // -------------------------------------------------------------------
 export default function DormDeal() {
   const [tab, setTab] = useState("deals");
-
-  // --- Onboarding state ---
-  const [userName, setUserName] = useState(null);       // null = not entered yet
-  const [budgets, setBudgets] = useState(null);          // null = not set up yet
-
-  // --- Live spending state (user updates this via Add Purchase) ---
+  const [screen, setScreen] = useState("main"); // "main" | "map" | "profile"
+  const [userName, setUserName] = useState(null);
+  const [budgets, setBudgets] = useState(null);
   const [spending, setSpending] = useState({});
 
-  // When budgets are set, initialize spending to 0 for each category
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
-    const initialSpending = {};
-    Object.keys(budgetMap).forEach((k) => { initialSpending[k] = 0; });
-    setSpending(initialSpending);
+    const init = {};
+    Object.keys(budgetMap).forEach((k) => { init[k] = 0; });
+    setSpending(init);
   };
 
-  // Add a purchase to a category
   const handleAddPurchase = (category, amount) => {
-    setSpending((prev) => ({
-      ...prev,
-      [category]: (prev[category] || 0) + amount,
-    }));
+    setSpending((prev) => ({ ...prev, [category]: (prev[category] || 0) + amount }));
   };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "GOOD MORNING" : hour < 17 ? "GOOD AFTERNOON" : "GOOD EVENING";
+
+  // Bottom nav: Map | Home | Profile
 
   return (
     <div style={S.app}>
@@ -697,62 +744,78 @@ export default function DormDeal() {
           <span>●●●</span>
         </div>
 
-        {/* Header */}
-        <div style={{ padding: "10px 20px 14px", flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-            <div>
-              <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px" }}>{greeting}</div>
-              <div style={{ color: "#fff", fontSize: "22px", fontWeight: 800 }}>
-                {userName ? `${userName} 👋` : "Welcome 👋"}
+        {/* ── MAP SCREEN ── */}
+        {screen === "map" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <MapScreen />
+          </div>
+        )}
+
+        {/* ── PROFILE SCREEN ── */}
+        {screen === "profile" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "12px 20px 8px", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+              <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px" }}>YOUR</div>
+              <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Profile</div>
+            </div>
+            <ProfileScreen userName={userName} />
+          </div>
+        )}
+
+        {/* ── MAIN SCREEN (deals / coach / budget) ── */}
+        {screen === "main" && (
+          <>
+            {/* Header */}
+            <div style={{ padding: "10px 20px 14px", flexShrink: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <div>
+                  <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px" }}>{greeting}</div>
+                  <div style={{ color: "#fff", fontSize: "22px", fontWeight: 800 }}>{userName ? `${userName} 👋` : "Welcome 👋"}</div>
+                </div>
+                <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {[["deals", "🔥 Deals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
+                  <button key={key} style={S.tab(tab === key)} onClick={() => setTab(key)}>{label}</button>
+                ))}
               </div>
             </div>
-            <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
-          </div>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: "6px" }}>
-            {[["deals", "🔥 Deals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
-              <button key={key} style={S.tab(tab === key)} onClick={() => setTab(key)}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab content */}
-        <div style={S.scrollArea}>
-          {tab === "deals" && <DealsTab />}
-          {tab === "coach" && (
-            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <CoachTab spending={spending} />
+            {/* Tab content */}
+            <div style={S.scrollArea}>
+              {tab === "deals" && <DealsTab />}
+              {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
+              {tab === "budget" && budgets && <BudgetTab budgets={budgets} spending={spending} onAddPurchase={handleAddPurchase} />}
             </div>
-          )}
-          {tab === "budget" && budgets && (
-            <BudgetTab
-              budgets={budgets}
-              spending={spending}
-              onAddPurchase={handleAddPurchase}
-            />
-          )}
-        </div>
-
-        {/* Bottom nav */}
-        <div style={{ display: "flex", justifyContent: "space-around", padding: "10px 24px 18px", background: "#0d0d1a", borderTop: "1px solid #1a1a2e", flexShrink: 0 }}>
-          {[["🔥", "Deals"], ["🗺️", "Map"], ["🤖", "AI"], ["👤", "Me"]].map(([icon, label]) => (
-            <div key={label} style={{ textAlign: "center", cursor: "pointer" }}>
-              <div style={{ fontSize: "18px" }}>{icon}</div>
-              <div style={{ color: "#ffffff33", fontSize: "9px", marginTop: "2px", fontWeight: 600, letterSpacing: "0.5px" }}>{label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1: Name prompt — shown on first open */}
-        {!userName && (
-          <NamePrompt onDone={(name) => setUserName(name)} />
+          </>
         )}
 
-        {/* Step 2: Budget setup — only when Budget tab is clicked for the first time */}
-        {userName && tab === "budget" && !budgets && (
-          <BudgetSetup onDone={handleBudgetDone} />
-        )}
+        {/* ── BOTTOM NAV: Map | Home | Profile ── */}
+        <div style={{ display: "flex", alignItems: "center", padding: "10px 20px 18px", background: "#0d0d1a", borderTop: "1px solid #1a1a2e", flexShrink: 0 }}>
+
+          {/* Map */}
+          <div onClick={() => setScreen("map")} style={{ flex: 1, textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: screen === "map" ? "rgba(74,222,128,0.15)" : "transparent", border: screen === "map" ? "1px solid rgba(74,222,128,0.3)" : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", transition: "all 0.2s" }}>🗺️</div>
+            <div style={{ color: screen === "map" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Map</div>
+          </div>
+
+          {/* Home — raised center button */}
+          <div onClick={() => setScreen("main")} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: "pointer", marginTop: "-18px" }}>
+            <div style={{ width: "56px", height: "56px", borderRadius: "18px", background: screen === "main" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", border: screen === "main" ? "none" : "1px solid #2a2a4a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: screen === "main" ? "0 4px 20px rgba(74,222,128,0.4)" : "0 4px 12px rgba(0,0,0,0.4)", transition: "all 0.2s" }}>🏠</div>
+            <div style={{ color: screen === "main" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Home</div>
+          </div>
+
+          {/* Profile */}
+          <div onClick={() => setScreen("profile")} style={{ flex: 1, textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: screen === "profile" ? "rgba(74,222,128,0.15)" : "transparent", border: screen === "profile" ? "1px solid rgba(74,222,128,0.3)" : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", transition: "all 0.2s" }}>👤</div>
+            <div style={{ color: screen === "profile" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Profile</div>
+          </div>
+
+        </div>
+
+        {/* Overlays */}
+        {!userName && <NamePrompt onDone={(name) => setUserName(name)} />}
+        {userName && tab === "budget" && screen === "main" && !budgets && <BudgetSetup onDone={handleBudgetDone} />}
       </div>
     </div>
   );
