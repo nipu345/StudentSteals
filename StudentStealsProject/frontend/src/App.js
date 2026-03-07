@@ -442,7 +442,7 @@ export default function DormDeal() {
         {/* Status bar */}
         <div style={S.statusBar}>
           <span>9:41</span>
-          <span style={{ color: "#4ade80", fontWeight: 700, letterSpacing: "1px", fontSize: "10px" }}>DORMDEAL</span>
+          <span style={{ color: "#4ade80", fontWeight: 700, letterSpacing: "1px", fontSize: "10px" }}>StudentSteals</span>
           <span>●●●</span>
         </div>
 
