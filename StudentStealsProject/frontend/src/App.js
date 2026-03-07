@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const BACKEND_URL = "http://localhost:5000"; // change to your deployed URL when live
+const BACKEND_URL = "http://localhost:8080"; // change to your deployed URL when live
 
 // -------------------------------------------------------------------
 // MOCK SPENDING DATA (replace with Plaid later)
