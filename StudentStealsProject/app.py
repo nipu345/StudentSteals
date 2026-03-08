@@ -5,7 +5,6 @@ import requests
 import os
 import math
 import json
-import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,10 +16,6 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
-# 1 hour cache — same location reuses results, zero extra API calls
-deals_cache = {}
-CACHE_TTL = 3600
 
 EMOJI_MAP = {
     "cafe": "☕", "coffee_shop": "☕", "restaurant": "🍽️", "fast_food": "🍔",
@@ -54,12 +49,6 @@ def get_deals():
 
     if not lat or not lng:
         return jsonify({"error": "lat and lng are required"}), 400
-
-    # Cache check — skip ALL api calls if we've done this location recently
-    cache_key = f"{round(lat, 3)},{round(lng, 3)}"
-    cached = deals_cache.get(cache_key)
-    if cached and (time.time() - cached["timestamp"]) < CACHE_TTL:
-        return jsonify({"deals": cached["deals"], "total": len(cached["deals"]), "cached": True})
 
     try:
         # ONE Google Places call — no detail fetches
@@ -99,8 +88,8 @@ def get_deals():
             for p in places_info
         ])
 
-        # ONE Gemini call for all 5 places
-        prompt = f"""You are a student deals assistant. Given these 5 nearby places, generate one realistic money-saving tip for a college student at each place.
+        # ONE Gemini call for all 10 places
+        prompt = f"""You are a student deals assistant. Given these 10 nearby places, generate one realistic money-saving tip for a college student at each place.
 
 Rules:
 - Base the tip on the place TYPE (restaurant, cafe, gym, etc.) — suggest realistic ways students commonly save there
@@ -119,7 +108,7 @@ Return exactly this JSON format:
     {{"index": 2, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 3, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 4, "tip": "...", "saving": "$X-Y", "category": "..."}},
-    {{"index": 5, "tip": "...", "saving": "$X-Y", "category": "..."}}
+    {{"index": 5, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 6, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 7, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 8, "tip": "...", "saving": "$X-Y", "category": "..."}},
@@ -154,10 +143,7 @@ Return exactly this JSON format:
 
         final_deals.sort(key=lambda x: x["distance_miles"])
 
-        # Cache so next load costs nothing
-        deals_cache[cache_key] = {"deals": final_deals, "timestamp": time.time()}
-
-        return jsonify({"deals": final_deals, "total": len(final_deals), "cached": False})
+        return jsonify({"deals": final_deals, "total": len(final_deals)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
