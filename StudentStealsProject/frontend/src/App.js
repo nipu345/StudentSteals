@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 
 const BACKEND_URL = "http://localhost:8080";
 
@@ -579,13 +580,37 @@ function CoachTab({ spending }) {
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending }) });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
-    } catch (e) {
-      setMessages((prev) => [...prev, { role: "assistant", text: `Sorry, something went wrong: ${e.message}` }]);
-    } finally { setLoading(false); }
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const res = await fetch(`${BACKEND_URL}/coach`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: userMsg,
+              spending: spending,
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude
+            }),
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
+          setLoading(false);
+        }, async () => {
+          // fallback if location denied — send without location
+          const res = await fetch(`${BACKEND_URL}/coach`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: userMsg, spending: spending }),
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
+          setLoading(false);
+        });
+      } catch (e) {
+        setMessages((prev) => [...prev, { role: "assistant", text: `Sorry, something went wrong: ${e.message}` }]);
+        setLoading(false);
+      }
   };
 
   const suggestions = ["I have $30 left this week 😬", "How do I save on textbooks?", "Best cheap meals near campus?", "Help me stick to my budget"];
@@ -597,7 +622,7 @@ function CoachTab({ spending }) {
           <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: "10px" }}>
             {msg.role === "assistant" && <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", marginRight: "8px", flexShrink: 0, marginTop: "2px" }}>🤖</div>}
             <div style={{ maxWidth: "75%", background: msg.role === "user" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", color: msg.role === "user" ? "#080810" : "#e2e8f0", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", padding: "10px 14px", fontSize: "13px", lineHeight: 1.6, border: msg.role === "assistant" ? "1px solid #1e1e3a" : "none" }}>
-              {msg.text}
+              {msg.role === "assistant" ? <ReactMarkdown>{msg.text}</ReactMarkdown> : msg.text}
             </div>
           </div>
         ))}
