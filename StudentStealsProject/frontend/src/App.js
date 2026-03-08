@@ -1087,7 +1087,7 @@ export default function DormDeal() {
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
-                {[["deals", "🔥 Deals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
+                {[["deals", "🔥 Steals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
                   <button key={key} style={S.tab(tab === key)} onClick={() => setTab(key)}>{label}</button>
                 ))}
               </div>
