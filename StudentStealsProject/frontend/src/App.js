@@ -378,7 +378,7 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
 // -------------------------------------------------------------------
 // MAP SCREEN
 // -------------------------------------------------------------------
-function MapScreen({ selectedDeal }) {
+function MapScreen({ selectedDeal, deals }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
@@ -414,17 +414,14 @@ function MapScreen({ selectedDeal }) {
       setStatus("success");
       setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
 
-      // Fetch deals and place markers
-      try {
-        const res = await fetch("http://localhost:8080/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat, lng }) });
-        const data = await res.json();
-        if (!data.deals) return;
-        data.deals.forEach((deal) => {
+      // Place markers from already-fetched deals — no extra API call
+      if (deals && deals.length > 0) {
+        deals.forEach((deal) => {
           const dealIcon = L.divIcon({ className: "", html: `<div style="background:#4ade80;color:#000;padding:4px 6px;border-radius:8px;font-size:12px;font-weight:700;">${deal.emoji}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
           const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon }).addTo(map).bindPopup(`<b>${deal.name}</b><br/>${deal.deal}<br/>💰 Save ${deal.saving}`);
           markersRef.current[deal.id] = marker;
         });
-      } catch (e) { console.error("Failed to load deal markers:", e); }
+      }
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -618,8 +615,7 @@ function BankLoginForm({ bankName, onSubmit, onClose }) {
 // -------------------------------------------------------------------
 // DEALS TAB
 // -------------------------------------------------------------------
-function DealsTab({ onDealClick }) {
-  const [deals, setDeals] = useState([]);
+function DealsTab({ deals, setDeals, onDealClick }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -643,8 +639,6 @@ function DealsTab({ onDealClick }) {
     );
   };
 
-  useEffect(() => { fetchDeals(); }, []);
-
   const categories = ["all", ...new Set(deals.map((d) => d.category))];
   const filtered = filter === "all" ? deals : deals.filter((d) => d.category === filter);
 
@@ -659,13 +653,24 @@ function DealsTab({ onDealClick }) {
       </div>
       {loading && <div style={{ textAlign: "center", color: "#4ade80", padding: "40px 0" }}><div style={{ fontSize: "28px", marginBottom: "8px" }}>📡</div><div style={{ fontSize: "13px" }}>Finding deals near you...</div></div>}
       {error && <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}><div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div><button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button></div>}
-      {!loading && !error && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "40px 0", fontSize: "13px" }}>No deals found nearby.</div>}
+      {!loading && !error && deals.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
+          <div style={{ color: "#fff", fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}>Find deals near you</div>
+          <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "20px" }}>AI scans real reviews to find you savings</div>
+          <button onClick={fetchDeals} style={{ ...S.btn, width: "auto", padding: "12px 24px", marginTop: 0 }}>🎯 Find Nearby Deals</button>
+        </div>
+      )}
+      {!loading && !error && deals.length > 0 && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "20px 0", fontSize: "13px" }}>No deals in this category.</div>}
       {!loading && filtered.map((deal, i) => (
-        <div key={deal.id || i} onClick={() => onDealClick && onDealClick(deal)} style={{ ...S.card, border: i < 3 ? "1px solid #4ade8022" : "1px solid #1e1e3a", cursor: "pointer" }}>
+        <div key={deal.id || i} onClick={() => onDealClick && onDealClick(deal)} style={{ ...S.card, border: "1px solid #4ade8022", cursor: "pointer" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>{deal.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>{deal.name}</div>
+                {deal.deal_found_in_reviews && <span style={{ background: "#4ade8022", color: "#4ade80", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "6px", letterSpacing: "0.5px" }}>FROM REVIEWS</span>}
+              </div>
               <div style={{ color: "#4ade8099", fontSize: "12px", marginTop: "2px" }}>{deal.deal}</div>
               <div style={{ color: "#ffffff33", fontSize: "11px", marginTop: "3px" }}>📍 {deal.distance_label} away{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · 🔴 Closed"}</div>
             </div>
@@ -853,11 +858,9 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
       {/* Summary card */}
       <div style={{ background: isOverall ? "linear-gradient(135deg, #53131333, #7f1d1d18)" : "linear-gradient(135deg, #13532d33, #15803d18)", border: `1px solid ${isOverall ? "#f8717133" : "#4ade8033"}`, borderRadius: "18px", padding: "16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
-            <div style={{ color: "#ffffff33", fontSize: "10px", fontWeight: 400 }}>across your budget</div>
-        </div>
+          <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
           <div style={{ color: isOverall ? "#f87171" : "#4ade80", fontSize: "30px", fontWeight: 700 }}>{isOverall ? `-$${Math.abs(moneyLeft).toFixed(2)}` : `$${moneyLeft.toFixed(2)}`}</div>
+          <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>${totalSpent.toFixed(2)} spent of ${totalBudget.toFixed(2)}</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ color: "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>THIS MONTH</div>
@@ -1028,6 +1031,7 @@ export default function DormDeal() {
   const [budgets, setBudgets] = useState(null);
   const [spending, setSpending] = useState({});
   const [selectedDeal, setSelectedDeal] = useState(null);
+  const [deals, setDeals] = useState([]);
 
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
@@ -1060,7 +1064,7 @@ export default function DormDeal() {
 
       <div style={{ ...S.phone, position: "relative" }}>
 
-        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} /></div>}
+        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} deals={deals} /></div>}
 
         {screen === "profile" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -1083,13 +1087,13 @@ export default function DormDeal() {
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
-                {[["deals", "🔥 Steals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
+                {[["deals", "🔥 Deals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
                   <button key={key} style={S.tab(tab === key)} onClick={() => setTab(key)}>{label}</button>
                 ))}
               </div>
             </div>
             <div style={S.scrollArea}>
-              {tab === "deals" && <DealsTab onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
+              {tab === "deals" && <DealsTab deals={deals} setDeals={setDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
               {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
               {tab === "budget" && budgets && (
                 <BudgetTab
