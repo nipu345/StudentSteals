@@ -195,21 +195,37 @@ def ai_coach():
     if spending:
         spending_context = f"\n\nStudent's current spending this month: {spending}"
 
-    prompt = f"""You are DormDeal's AI financial coach for college students.
-You are friendly, practical, and concise. You understand student life — dining halls,
-ramen budgets, textbook costs, late night food runs, and living on financial aid.
-Keep responses under 150 words. Use bullet points when listing tips.
-Always be encouraging, never judgmental about money mistakes.
+    nearby_context = ""
+    if "lat" in data and "lng" in data:
+        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        params = {
+            "location": f"{data['lat']},{data['lng']}",
+            "radius": 1000,
+            "type": "restaurant|cafe|grocery_or_supermarket",
+            "key": GOOGLE_API_KEY
+        }
+        places_resp = requests.get(url, params=params).json()
+        places = places_resp.get("results", [])[:5]
+        place_names = [f"{p['name']} (rating: {p.get('rating', 'N/A')})" for p in places]
+        nearby_context = f"\n\nNearby places within walking distance: {', '.join(place_names)}"
 
-Student's question: {user_message}{spending_context}"""
+    prompt = f"""You are StudentSteals' AI financial coach for college students.
+Be friendly and practical. Format responses with **bold** headers and bullet points.
+When suggesting food options always give TWO choices:
+1. A cheap recipe they can cook with ingredients and estimated cost
+2. A nearby restaurant from the list below that fits their budget
+Always mention specific nearby places by name when relevant.
+
+{nearby_context}
+{spending_context}
+
+Student's question: {user_message}"""
 
     try:
         response = model.generate_content(prompt)
         return jsonify({"response": response.text})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # -------------------------------------------------------------------
 # ROUTE 3: AI SWAPS
