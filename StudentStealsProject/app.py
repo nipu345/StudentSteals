@@ -74,7 +74,7 @@ def get_deals():
         if resp.get("status") not in ["OK", "ZERO_RESULTS"]:
             return jsonify({"error": f"Google Places error: {resp.get('status')}"}), 500
 
-        places = resp.get("results", [])[:5]
+        places = resp.get("results", [])[:10]
         if not places:
             return jsonify({"deals": [], "total": 0})
 
@@ -120,6 +120,11 @@ Return exactly this JSON format:
     {{"index": 3, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 4, "tip": "...", "saving": "$X-Y", "category": "..."}},
     {{"index": 5, "tip": "...", "saving": "$X-Y", "category": "..."}}
+    {{"index": 6, "tip": "...", "saving": "$X-Y", "category": "..."}},
+    {{"index": 7, "tip": "...", "saving": "$X-Y", "category": "..."}},
+    {{"index": 8, "tip": "...", "saving": "$X-Y", "category": "..."}},
+    {{"index": 9, "tip": "...", "saving": "$X-Y", "category": "..."}},
+    {{"index": 10, "tip": "...", "saving": "$X-Y", "category": "..."}}
   ]
 }}"""
 
