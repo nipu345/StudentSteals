@@ -97,8 +97,10 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
     dlon = lon2 - lon1
+
     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
     c = 2 * math.asin(math.sqrt(a))
+
     return round(R * c, 2)
 
 # -------------------------------------------------------------------
@@ -106,6 +108,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 # -------------------------------------------------------------------
 def enrich_with_deals(places, user_lat, user_lng):
     results = []
+
     for place in places:
         place_types = place.get("types", [])
 
@@ -117,21 +120,30 @@ def enrich_with_deals(places, user_lat, user_lng):
 
         place_lat = place["geometry"]["location"]["lat"]
         place_lng = place["geometry"]["location"]["lng"]
+
         distance = calculate_distance(user_lat, user_lng, place_lat, place_lng)
 
         results.append({
             "id": place.get("place_id"),
             "name": place.get("name"),
             "address": place.get("vicinity", ""),
+
+            # IMPORTANT FOR MAP MARKERS
+            "lat": place_lat,
+            "lng": place_lng,
+
             "distance_miles": distance,
             "distance_label": f"{distance} mi",
+
             "rating": place.get("rating", None),
             "open_now": place.get("opening_hours", {}).get("open_now", None),
+
             "deal": matched_deal["deal"],
             "saving": matched_deal["saving"],
             "emoji": matched_deal["emoji"],
             "category": matched_deal["category"],
-            "types": place_types[:3],
+
+            "types": place_types[:3]
         })
 
     results.sort(key=lambda x: x["distance_miles"])
@@ -143,6 +155,7 @@ def enrich_with_deals(places, user_lat, user_lng):
 # -------------------------------------------------------------------
 @app.route("/deals", methods=["POST"])
 def get_deals():
+
     data = request.json
     lat = data.get("lat")
     lng = data.get("lng")
@@ -152,6 +165,7 @@ def get_deals():
         return jsonify({"error": "lat and lng are required"}), 400
 
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+
     params = {
         "location": f"{lat},{lng}",
         "radius": radius,
@@ -184,6 +198,7 @@ def get_deals():
 # -------------------------------------------------------------------
 @app.route("/coach", methods=["POST"])
 def ai_coach():
+
     data = request.json
     user_message = data.get("message", "")
     spending = data.get("spending", {})
@@ -196,52 +211,76 @@ def ai_coach():
         spending_context = f"\n\nStudent's current spending this month: {spending}"
 
     nearby_context = ""
+
     if "lat" in data and "lng" in data:
+
         url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+
         params = {
             "location": f"{data['lat']},{data['lng']}",
             "radius": 1000,
             "type": "restaurant|cafe|grocery_or_supermarket",
             "key": GOOGLE_API_KEY
         }
+
         places_resp = requests.get(url, params=params).json()
+
         places = places_resp.get("results", [])[:5]
-        place_names = [f"{p['name']} (rating: {p.get('rating', 'N/A')})" for p in places]
+
+        place_names = [
+            f"{p['name']} (rating: {p.get('rating', 'N/A')})"
+            for p in places
+        ]
+
         nearby_context = f"\n\nNearby places within walking distance: {', '.join(place_names)}"
 
-    prompt = f"""You are StudentSteals' AI financial coach for college students.
-Be friendly and practical. Format responses with **bold** headers and bullet points.
+    prompt = f"""
+You are StudentSteals' AI financial coach for college students.
+
+Be friendly and practical.
+
+Format responses with **bold** headers and bullet points.
+
 When suggesting food options always give TWO choices:
 1. A cheap recipe they can cook with ingredients and estimated cost
 2. A nearby restaurant from the list below that fits their budget
+
 Always mention specific nearby places by name when relevant.
 
 {nearby_context}
+
 {spending_context}
 
-Student's question: {user_message}"""
+Student's question: {user_message}
+"""
 
     try:
         response = model.generate_content(prompt)
         return jsonify({"response": response.text})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # -------------------------------------------------------------------
 # ROUTE 3: AI SWAPS
 # -------------------------------------------------------------------
 @app.route("/swaps", methods=["POST"])
 def get_swaps():
+
     data = request.json
     spending = data.get("spending", {})
 
     if not spending:
         return jsonify({"error": "spending data is required"}), 400
 
-    prompt = f"""A college student has these monthly expenses: {spending}
+    prompt = f"""
+A college student has these monthly expenses: {spending}
 
 Suggest exactly 3 specific money-saving swaps for this student.
+
 Respond ONLY with valid JSON in this exact format, nothing else, no markdown:
+
 {{
   "swaps": [
     {{
@@ -251,13 +290,18 @@ Respond ONLY with valid JSON in this exact format, nothing else, no markdown:
       "emoji": "relevant emoji"
     }}
   ]
-}}"""
+}}
+"""
 
     try:
+
         response = model.generate_content(prompt)
+
         raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+
         import json
         swaps_data = json.loads(raw)
+
         return jsonify(swaps_data)
 
     except Exception as e:
@@ -269,7 +313,10 @@ Respond ONLY with valid JSON in this exact format, nothing else, no markdown:
 # -------------------------------------------------------------------
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "service": "DormDeal API"})
+    return jsonify({
+        "status": "ok",
+        "service": "DormDeal API"
+    })
 
 
 if __name__ == "__main__":
