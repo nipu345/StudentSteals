@@ -377,9 +377,10 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
 // -------------------------------------------------------------------
 // MAP SCREEN
 // -------------------------------------------------------------------
-function MapScreen() {
+function MapScreen({ selectedDeal }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const markersRef = useRef({});
   const [status, setStatus] = useState("loading");
   const [coords, setCoords] = useState(null);
 
@@ -391,48 +392,144 @@ function MapScreen() {
       link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
       document.head.appendChild(link);
     }
-    const loadLeaflet = () => new Promise((resolve) => {
-      if (window.L) return resolve(window.L);
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve(window.L);
-      document.head.appendChild(script);
-    });
+
+    const loadLeaflet = () =>
+      new Promise((resolve) => {
+        if (window.L) return resolve(window.L);
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => resolve(window.L);
+        document.head.appendChild(script);
+      });
+
     const initMap = async (lat, lng) => {
       const L = await loadLeaflet();
       if (!mapRef.current || mapInstanceRef.current) return;
-      const map = L.map(mapRef.current, { center: [lat, lng], zoom: 15, zoomControl: false });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap © CARTO", maxZoom: 19 }).addTo(map);
-      const greenDot = L.divIcon({ className: "", html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
-      L.marker([lat, lng], { icon: greenDot }).addTo(map).bindPopup("<b style='font-family:sans-serif'>You are here</b>").openPopup();
-      const pulseIcon = L.divIcon({ className: "", html: `<div style="width:60px;height:60px;border-radius:50%;background:rgba(74,222,128,0.12);border:2px solid rgba(74,222,128,0.3);margin-left:-21px;margin-top:-21px;"></div>`, iconSize: [60, 60] });
-      L.marker([lat, lng], { icon: pulseIcon, interactive: false }).addTo(map);
+
+      const map = L.map(mapRef.current, {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: false
+      });
+
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        {
+          attribution: "© OpenStreetMap © CARTO",
+          maxZoom: 19
+        }
+      ).addTo(map);
+
+      const greenDot = L.divIcon({
+        className: "",
+        html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+
+      L.marker([lat, lng], { icon: greenDot })
+        .addTo(map)
+        .bindPopup("<b>You are here</b>");
+
       mapInstanceRef.current = map;
+
       setStatus("success");
       setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
+
+      // FETCH DEALS
+      const res = await fetch("http://localhost:8080/deals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ lat, lng })
+      });
+
+      const data = await res.json();
+
+      if (!data.deals) return;
+
+      data.deals.forEach((deal) => {
+        const dealIcon = L.divIcon({
+          className: "",
+          html: `
+            <div style="
+              background:#4ade80;
+              color:#000;
+              padding:4px 6px;
+              border-radius:8px;
+              font-size:12px;
+              font-weight:700;
+            ">
+              ${deal.emoji}
+            </div>
+          `,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+
+        const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon })
+          .addTo(map)
+          .bindPopup(`
+            <b>${deal.name}</b><br/>
+            ${deal.deal}<br/>
+            💰 Save ${deal.saving}
+          `);
+
+        markersRef.current[deal.id] = marker;
+      });
     };
-    if (!navigator.geolocation) { setStatus("error"); return; }
-    navigator.geolocation.getCurrentPosition((pos) => initMap(pos.coords.latitude, pos.coords.longitude), () => setStatus("denied"));
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
+      () => setStatus("denied")
+    );
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
   }, []);
 
+  // ------------------------------------------------
+  // ZOOM TO DEAL WHEN SELECTED
+  // ------------------------------------------------
+  useEffect(() => {
+    if (!selectedDeal) return;
+
+    const marker = markersRef.current[selectedDeal.id];
+    const map = mapInstanceRef.current;
+
+    if (marker && map) {
+      map.setView(marker.getLatLng(), 17);
+      marker.openPopup();
+    }
+  }, [selectedDeal]);
+
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
-      <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
-        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Nearby Map</div>
-        {coords && <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "2px", fontFamily: "monospace" }}>📍 {coords.lat}, {coords.lng}</div>}
-      </div>
-      <div style={{ flex: 1, position: "relative", margin: "0 12px 12px", borderRadius: "20px", overflow: "hidden", border: "1px solid #1e1e3a" }}>
-        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
-        {status === "loading" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📡</div><div style={{ color: "#4ade80", fontSize: "13px", fontWeight: 700 }}>Finding your location...</div><div style={{ color: "#ffffff44", fontSize: "11px" }}>Please allow location access</div></div>}
-        {status === "denied" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "24px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📍</div><div style={{ color: "#f87171", fontSize: "13px", fontWeight: 700, textAlign: "center" }}>Location access denied</div><div style={{ color: "#ffffff44", fontSize: "11px", textAlign: "center" }}>Enable location in your browser settings to see the map</div></div>}
-        {status === "success" && mapInstanceRef.current && (
-          <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: "4px", zIndex: 1000 }}>
-            {["+", "−"].map((label, i) => <button key={i} onClick={() => i === 0 ? mapInstanceRef.current.zoomIn() : mapInstanceRef.current.zoomOut()} style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{label}</button>)}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "16px 20px 12px" }}>
+        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>
+          Nearby Map
+        </div>
+        {coords && (
+          <div style={{ color: "#4ade8088", fontSize: "11px" }}>
+            📍 {coords.lat}, {coords.lng}
           </div>
         )}
-        {status === "success" && <button onClick={() => { navigator.geolocation.getCurrentPosition((pos) => { mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 15); }); }} style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, background: "#13132a", border: "1px solid #4ade8044", borderRadius: "10px", color: "#4ade80", fontSize: "11px", fontWeight: 700, padding: "8px 12px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>◎ Recenter</button>}
       </div>
+
+      <div
+        ref={mapRef}
+        style={{
+          flex: 1,
+          margin: "0 12px 12px",
+          borderRadius: "20px",
+          overflow: "hidden"
+        }}
+      />
     </div>
   );
 }
