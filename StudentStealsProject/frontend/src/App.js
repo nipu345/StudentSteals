@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 
 const BACKEND_URL = "http://localhost:8080";
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 // -------------------------------------------------------------------
 // LOAD PURCHASES from purchases.txt (in /public folder)
 // -------------------------------------------------------------------
@@ -392,147 +393,85 @@ function MapScreen({ selectedDeal }) {
       link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
       document.head.appendChild(link);
     }
-
-    const loadLeaflet = () =>
-      new Promise((resolve) => {
-        if (window.L) return resolve(window.L);
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = () => resolve(window.L);
-        document.head.appendChild(script);
-      });
+    const loadLeaflet = () => new Promise((resolve) => {
+      if (window.L) return resolve(window.L);
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = () => resolve(window.L);
+      document.head.appendChild(script);
+    });
 
     const initMap = async (lat, lng) => {
       const L = await loadLeaflet();
       if (!mapRef.current || mapInstanceRef.current) return;
+      const map = L.map(mapRef.current, { center: [lat, lng], zoom: 15, zoomControl: false });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap © CARTO", maxZoom: 19 }).addTo(map);
 
-      const map = L.map(mapRef.current, {
-        center: [lat, lng],
-        zoom: 15,
-        zoomControl: false
-      });
-
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          attribution: "© OpenStreetMap © CARTO",
-          maxZoom: 19
-        }
-      ).addTo(map);
-
-      const greenDot = L.divIcon({
-        className: "",
-        html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
-      });
-
-      L.marker([lat, lng], { icon: greenDot })
-        .addTo(map)
-        .bindPopup("<b>You are here</b>");
-
+      // Green dot for user location
+      const greenDot = L.divIcon({ className: "", html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+      L.marker([lat, lng], { icon: greenDot }).addTo(map).bindPopup("<b>You are here</b>");
       mapInstanceRef.current = map;
-
       setStatus("success");
       setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
 
-      // FETCH DEALS
-      const res = await fetch("http://localhost:8080/deals", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ lat, lng })
-      });
-
-      const data = await res.json();
-
-      if (!data.deals) return;
-
-      data.deals.forEach((deal) => {
-        const dealIcon = L.divIcon({
-          className: "",
-          html: `
-            <div style="
-              background:#4ade80;
-              color:#000;
-              padding:4px 6px;
-              border-radius:8px;
-              font-size:12px;
-              font-weight:700;
-            ">
-              ${deal.emoji}
-            </div>
-          `,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
+      // Fetch deals and place markers
+      try {
+        const res = await fetch("http://localhost:8080/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat, lng }) });
+        const data = await res.json();
+        if (!data.deals) return;
+        data.deals.forEach((deal) => {
+          const dealIcon = L.divIcon({ className: "", html: `<div style="background:#4ade80;color:#000;padding:4px 6px;border-radius:8px;font-size:12px;font-weight:700;">${deal.emoji}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+          const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon }).addTo(map).bindPopup(`<b>${deal.name}</b><br/>${deal.deal}<br/>💰 Save ${deal.saving}`);
+          markersRef.current[deal.id] = marker;
         });
-
-        const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon })
-          .addTo(map)
-          .bindPopup(`
-            <b>${deal.name}</b><br/>
-            ${deal.deal}<br/>
-            💰 Save ${deal.saving}
-          `);
-
-        markersRef.current[deal.id] = marker;
-      });
+      } catch (e) { console.error("Failed to load deal markers:", e); }
     };
 
     navigator.geolocation.getCurrentPosition(
       (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
       () => setStatus("denied")
     );
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
+    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
-  // ------------------------------------------------
-  // ZOOM TO DEAL WHEN SELECTED
-  // ------------------------------------------------
+  // Fly to selected deal — retry until marker is placed on map
   useEffect(() => {
     if (!selectedDeal) return;
-
-    const marker = markersRef.current[selectedDeal.id];
-    const map = mapInstanceRef.current;
-
-    if (marker && map) {
-      map.setView(marker.getLatLng(), 17);
-      marker.openPopup();
-    }
+    let attempts = 0;
+    const interval = setInterval(() => {
+      const marker = markersRef.current[selectedDeal.id];
+      const map = mapInstanceRef.current;
+      if (marker && map) {
+        map.setView(marker.getLatLng(), 17);
+        marker.openPopup();
+        clearInterval(interval);
+      }
+      if (++attempts > 30) clearInterval(interval); // give up after 3s
+    }, 100);
+    return () => clearInterval(interval);
   }, [selectedDeal]);
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "16px 20px 12px" }}>
-        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>
-          Nearby Map
-        </div>
-        {coords && (
-          <div style={{ color: "#4ade8088", fontSize: "11px" }}>
-            📍 {coords.lat}, {coords.lng}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+      <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
+        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Nearby Map</div>
+        {coords && <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "2px", fontFamily: "monospace" }}>📍 {coords.lat}, {coords.lng}</div>}
+      </div>
+      <div style={{ flex: 1, position: "relative", margin: "0 12px 12px", borderRadius: "20px", overflow: "hidden", border: "1px solid #1e1e3a" }}>
+        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+        {status === "loading" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📡</div><div style={{ color: "#4ade80", fontSize: "13px", fontWeight: 700 }}>Finding your location...</div></div>}
+        {status === "denied" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "24px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📍</div><div style={{ color: "#f87171", fontSize: "13px", fontWeight: 700, textAlign: "center" }}>Location access denied</div></div>}
+        {status === "success" && mapInstanceRef.current && (
+          <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: "4px", zIndex: 1000 }}>
+            {["+", "−"].map((label, i) => <button key={i} onClick={() => i === 0 ? mapInstanceRef.current.zoomIn() : mapInstanceRef.current.zoomOut()} style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{label}</button>)}
           </div>
         )}
+        {status === "success" && <button onClick={() => { navigator.geolocation.getCurrentPosition((pos) => { mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 15); }); }} style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, background: "#13132a", border: "1px solid #4ade8044", borderRadius: "10px", color: "#4ade80", fontSize: "11px", fontWeight: 700, padding: "8px 12px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>◎ Recenter</button>}
       </div>
-
-      <div
-        ref={mapRef}
-        style={{
-          flex: 1,
-          margin: "0 12px 12px",
-          borderRadius: "20px",
-          overflow: "hidden"
-        }}
-      />
     </div>
   );
 }
+
 
 // -------------------------------------------------------------------
 // PROFILE SCREEN
@@ -679,7 +618,7 @@ function BankLoginForm({ bankName, onSubmit, onClose }) {
 // -------------------------------------------------------------------
 // DEALS TAB
 // -------------------------------------------------------------------
-function DealsTab() {
+function DealsTab({ onDealClick }) {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -722,7 +661,7 @@ function DealsTab() {
       {error && <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}><div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div><button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button></div>}
       {!loading && !error && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "40px 0", fontSize: "13px" }}>No deals found nearby.</div>}
       {!loading && filtered.map((deal, i) => (
-        <div key={deal.id || i} style={{ ...S.card, border: i < 3 ? "1px solid #4ade8022" : "1px solid #1e1e3a" }}>
+        <div key={deal.id || i} onClick={() => onDealClick && onDealClick(deal)} style={{ ...S.card, border: i < 3 ? "1px solid #4ade8022" : "1px solid #1e1e3a", cursor: "pointer" }}>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
             <div style={{ flex: 1 }}>
@@ -813,8 +752,8 @@ function CoachTab({ spending }) {
 // BUDGET TAB
 // -------------------------------------------------------------------
 function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
-  const [swaps, setSwaps] = useState(null);
-  const [loadingSwaps, setLoadingSwaps] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [bankConnected, setBankConnected] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
@@ -877,13 +816,27 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
     }
   };
 
-  const fetchSwaps = async () => {
-    setLoadingSwaps(true);
+  const fetchInsights = async () => {
+    setLoadingInsights(true);
+    setInsights(null);
     try {
-      const res = await fetch(`${BACKEND_URL}/swaps`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spending }) });
+      const res = await fetch(`${BACKEND_URL}/insights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          budgets,
+          spending,
+          transactions: syncedTransactions,
+        }),
+      });
       const data = await res.json();
-      setSwaps(data.swaps);
-    } catch (e) { console.error(e); } finally { setLoadingSwaps(false); }
+      if (data.error) throw new Error(data.error);
+      setInsights(data.insights);
+    } catch (e) {
+      setInsights("Something went wrong. Make sure your backend is running.");
+    } finally {
+      setLoadingInsights(false);
+    }
   };
 
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
@@ -900,9 +853,11 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
       {/* Summary card */}
       <div style={{ background: isOverall ? "linear-gradient(135deg, #53131333, #7f1d1d18)" : "linear-gradient(135deg, #13532d33, #15803d18)", border: `1px solid ${isOverall ? "#f8717133" : "#4ade8033"}`, borderRadius: "18px", padding: "16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
+            <div style={{ color: "#ffffff33", fontSize: "10px", fontWeight: 400 }}>across your budget</div>
+        </div>
           <div style={{ color: isOverall ? "#f87171" : "#4ade80", fontSize: "30px", fontWeight: 700 }}>{isOverall ? `-$${Math.abs(moneyLeft).toFixed(2)}` : `$${moneyLeft.toFixed(2)}`}</div>
-          <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>${totalSpent.toFixed(2)} spent of ${totalBudget.toFixed(2)}</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ color: "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>THIS MONTH</div>
@@ -992,22 +947,25 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
         + Add Purchase Manually
       </button>
 
-      {/* AI Swaps */}
-      <button onClick={fetchSwaps} style={S.btn} disabled={loadingSwaps}>
-        {loadingSwaps ? "Getting AI swaps..." : "✨ Get AI-Powered Swaps"}
+      {/* AI Spending Insights */}
+      <button onClick={fetchInsights} style={S.btn} disabled={loadingInsights}>
+        {loadingInsights ? "Analyzing your spending..." : "✨ Get AI Spending Insights"}
       </button>
 
-      {swaps && swaps.map((swap, i) => (
-        <div key={i} style={{ ...S.card, marginTop: "10px" }}>
-          <div style={{ fontSize: "20px", marginBottom: "8px" }}>{swap.emoji}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}><span style={{ background: "#ff4d4d18", color: "#f87171", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>❌ {swap.from}</span></div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}><span style={{ background: "#4ade8018", color: "#4ade80", padding: "3px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>✅ {swap.to}</span></div>
-          <div style={{ background: "#13532d33", borderRadius: "10px", padding: "8px 12px", display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#86efac", fontSize: "12px" }}>Save</span>
-            <span style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px" }}>{swap.save}</span>
+      {insights && (
+        <div style={{ ...S.card, marginTop: "10px", border: "1px solid #4ade8033" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>🤖</div>
+            <div>
+              <div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700, letterSpacing: "1px" }}>AI SPENDING INSIGHTS</div>
+              <div style={{ color: "#ffffff44", fontSize: "10px" }}>Based on your recent transactions</div>
+            </div>
+          </div>
+          <div style={{ color: "#e2e8f0", fontSize: "13px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+            <ReactMarkdown>{insights}</ReactMarkdown>
           </div>
         </div>
-      ))}
+      )}
 
       {/* Modals */}
       {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
@@ -1069,6 +1027,7 @@ export default function DormDeal() {
   const [userName, setUserName] = useState(null);
   const [budgets, setBudgets] = useState(null);
   const [spending, setSpending] = useState({});
+  const [selectedDeal, setSelectedDeal] = useState(null);
 
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
@@ -1101,7 +1060,7 @@ export default function DormDeal() {
 
       <div style={{ ...S.phone, position: "relative" }}>
 
-        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen /></div>}
+        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} /></div>}
 
         {screen === "profile" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -1124,13 +1083,13 @@ export default function DormDeal() {
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
-                {[["deals", "🔥 Deals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
+                {[["deals", "🔥 Steals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
                   <button key={key} style={S.tab(tab === key)} onClick={() => setTab(key)}>{label}</button>
                 ))}
               </div>
             </div>
             <div style={S.scrollArea}>
-              {tab === "deals" && <DealsTab />}
+              {tab === "deals" && <DealsTab onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
               {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
               {tab === "budget" && budgets && (
                 <BudgetTab
