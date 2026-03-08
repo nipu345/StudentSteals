@@ -2,6 +2,163 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 
 const BACKEND_URL = "http://localhost:8080";
+// -------------------------------------------------------------------
+// LOAD PURCHASES from purchases.txt (in /public folder)
+// -------------------------------------------------------------------
+async function loadPurchases() {
+  const res = await fetch("/purchases.txt");
+  const text = await res.text();
+  const lines = text.trim().split("\n").filter(Boolean);
+  return lines.map((line) => {
+    const [name, amount] = line.split("|").map((s) => s.trim());
+    return { name, amount: parseFloat(amount) };
+  });
+}
+
+// -------------------------------------------------------------------
+function categorizeAllAtOnce(purchases, userCategories) {
+  const purchaseCategories = {
+    // FOOD — anything you eat, drink, or consume
+    "chipotle burrito bowl": "food",
+    "chipotle chips and guac": "food",
+    "starbucks latte": "food",
+    "dunkin coffee and bagel": "food",
+    "target groceries run": "food",
+    "whole foods salad bar": "food",
+    "dominos pizza": "food",
+    "panera bread sandwich": "food",
+    "trader joes grocery haul": "food",
+    "mcdonald's meal": "food",
+    "subway footlong": "food",
+    "campus vending machine": "food",
+    "ramen noodles bulk pack": "food",
+    "five guys burger": "food",
+    "wendys combo meal": "food",
+    "campus dining hall": "food",
+    "smoothie king": "food",
+    "chick-fil-a": "food",
+    "kroger grocery run": "food",
+    "buffalo wild wings": "food",
+    "taco bell late night": "food",
+    "costco bulk groceries": "food",
+    "panda express": "food",
+    "campus coffee cart": "food",
+    "postmates delivery": "food",
+    "jersey mikes sub": "food",
+    "local pizza place": "food",
+    "uber eats delivery fee": "food",
+    "safeway grocery run": "food",
+    "duck donuts": "food",
+    "crumbl cookie": "food",
+    "grubhub order": "food",
+    "roommate groceries split": "food",
+    "7-eleven snacks": "food",
+    "wingstop": "food",
+    "jamba juice": "food",
+    "venmo friend for dinner": "food",
+    "aldi grocery run": "food",
+    "campus snack bar": "food",
+    "local diner breakfast": "food",
+    "ihop weekend brunch": "food",
+    "waffle house": "food",
+    "boba tea shop": "food",
+    "wing stop delivery": "food",
+    "study snacks cvs": "food",
+    "instacart delivery fee": "food",
+    "red bull energy drinks": "food",
+    // TRANSPORT — getting around
+    "uber ride to campus": "transport",
+    "shell gas station": "transport",
+    "lyft to airport": "transport",
+    "parking meter": "transport",
+    "lyft shared ride": "transport",
+    "parking garage": "transport",
+    // SUBSCRIPTIONS — recurring digital services
+    "amazon prime monthly": "subscriptions",
+    "spotify premium": "subscriptions",
+    "netflix subscription": "subscriptions",
+    "google one storage plan": "subscriptions",
+    "apple app store purchase": "subscriptions",
+    "hulu subscription": "subscriptions",
+    "chegg subscription": "subscriptions",
+    "adobe creative cloud": "subscriptions",
+    "discord nitro": "subscriptions",
+    "youtube premium": "subscriptions",
+    "dropbox plus": "subscriptions",
+    "notion pro": "subscriptions",
+    "linkedin learning": "subscriptions",
+    "grammarly premium": "subscriptions",
+    "zoom pro subscription": "subscriptions",
+    "coursera online course": "subscriptions",
+    // SHOPPING — physical goods and retail
+    "ikea desk lamp": "shopping",
+    "walgreens toiletries": "shopping",
+    "h&m clothing": "shopping",
+    "airpods case replacement": "shopping",
+    "sephora skincare": "shopping",
+    "foot locker sneakers": "shopping",
+    "shein clothing haul": "shopping",
+    "hot topic": "shopping",
+    "old navy jeans": "shopping",
+    "bath and body works": "shopping",
+    "bike repair shop": "shopping",
+    "campus tech store cable": "shopping",
+    "dollar tree supplies": "shopping",
+    // SCHOOL — education related
+    "campus bookstore textbook": "school",
+    "used textbook ebay": "school",
+    "barnes and noble": "school",
+    "campus printer credits": "school",
+    // HEALTH — body and wellness
+    "planet fitness membership": "health",
+    "gym day pass": "health",
+    "cvs pharmacy": "health",
+    "walgreens cold medicine": "health",
+    "protein powder gnc": "health",
+    "gym supplement store": "health",
+    "vitamin c supplements": "health",
+    "multivitamin pack": "health",
+    "melatonin sleep aid": "health",
+    "ibuprofen advil": "health",
+    "tylenol pain relief": "health",
+    "zinc supplements": "health",
+    "iron supplement": "health",
+    "allergy medicine zyrtec": "health",
+    "nyquil cold medicine": "health",
+    "vitamin d3": "health",
+    // UTILITIES — bills and essentials
+    "sprint phone bill": "utilities",
+    "electric bill split": "utilities",
+    "rent portion": "utilities",
+    "laundromat": "utilities",
+    "ups shipping": "utilities",
+    "fedex package": "utilities",
+    // ENTERTAINMENT — going out and fun
+    "local bar tab": "entertainment",
+    "movie theater ticket": "entertainment",
+  };
+
+  const matchUserCategory = (type) => {
+    for (const cat of userCategories) {
+      const c = cat.toLowerCase();
+      if (type === "food" && (c.includes("food") || c.includes("eat") || c.includes("grocer") || c.includes("dining") || c.includes("meal"))) return cat;
+      if (type === "transport" && (c.includes("transport") || c.includes("travel") || c.includes("car") || c.includes("gas") || c.includes("ride"))) return cat;
+      if (type === "subscriptions" && (c.includes("sub") || c.includes("stream") || c.includes("media"))) return cat;
+      if (type === "shopping" && (c.includes("shop") || c.includes("cloth") || c.includes("retail") || c.includes("personal"))) return cat;
+      if (type === "health" && (c.includes("health") || c.includes("gym") || c.includes("fitness") || c.includes("medical"))) return cat;
+      if (type === "school" && (c.includes("school") || c.includes("book") || c.includes("tuition") || c.includes("edu") || c.includes("campus"))) return cat;
+      if (type === "utilities" && (c.includes("util") || c.includes("rent") || c.includes("bill") || c.includes("electric") || c.includes("phone"))) return cat;
+      if (type === "entertainment" && (c.includes("entertain") || c.includes("fun") || c.includes("social") || c.includes("bar"))) return cat;
+    }
+    return null;
+  };
+
+  return purchases.map((p) => {
+    const type = purchaseCategories[p.name.toLowerCase()] || null;
+    const category = type ? matchUserCategory(type) : null;
+    return { ...p, category: category || "Other" };
+  });
+}
 
 // -------------------------------------------------------------------
 // STYLES
@@ -25,14 +182,6 @@ const S = {
     boxShadow: "0 0 0 2px #1a1a2e, 0 50px 100px rgba(0,0,0,0.9), 0 0 80px rgba(99,200,100,0.06)",
     display: "flex",
     flexDirection: "column",
-  },
-  statusBar: {
-    padding: "14px 24px 0",
-    display: "flex",
-    justifyContent: "space-between",
-    color: "#ffffff55",
-    fontSize: "11px",
-    flexShrink: 0,
   },
   scrollArea: { flex: 1, overflowY: "auto", scrollbarWidth: "none" },
   card: {
@@ -146,7 +295,7 @@ function NamePrompt({ onDone }) {
 function BudgetSetup({ onDone }) {
   const [rows, setRows] = useState([
     { category: "Food", budget: "" },
-    { category: "Coffee", budget: "" },
+    { category: "Subscriptions", budget: "" },
     { category: "Transport", budget: "" },
   ]);
 
@@ -168,12 +317,10 @@ function BudgetSetup({ onDone }) {
         <div style={{ fontSize: "28px", marginBottom: "8px", textAlign: "center" }}>📊</div>
         <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, textAlign: "center", marginBottom: "4px" }}>Set Your Monthly Budget</div>
         <div style={{ color: "#ffffff55", fontSize: "11px", textAlign: "center", marginBottom: "20px" }}>Add categories and how much you want to spend on each</div>
-
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px", paddingRight: "28px" }}>
           <div style={{ flex: 2, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>CATEGORY</div>
           <div style={{ flex: 1, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>BUDGET ($)</div>
         </div>
-
         {rows.map((row, i) => (
           <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "center" }}>
             <input value={row.category} onChange={(e) => updateRow(i, "category", e.target.value)} placeholder="e.g. Food" style={{ ...S.input, flex: 2 }} />
@@ -181,7 +328,6 @@ function BudgetSetup({ onDone }) {
             <button onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: "#f87171", fontSize: "16px", cursor: "pointer", flexShrink: 0, padding: "0 2px" }}>×</button>
           </div>
         ))}
-
         <button onClick={addRow} style={{ background: "none", border: "1px dashed #1e1e3a", borderRadius: "12px", color: "#4ade8088", fontSize: "12px", fontWeight: 700, cursor: "pointer", width: "100%", padding: "10px", fontFamily: "'Syne', sans-serif", marginBottom: "16px" }}>
           + Add Category
         </button>
@@ -214,12 +360,10 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
           <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Add Purchase</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff55", fontSize: "20px", cursor: "pointer" }}>×</button>
         </div>
-
         <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>CATEGORY</div>
         <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...S.input, marginBottom: "14px", appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234ade80'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: "32px", cursor: "pointer" }}>
           {categories.map((c) => <option key={c} value={c} style={{ background: "#13132a" }}>{c}</option>)}
         </select>
-
         <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>AMOUNT ($)</div>
         <input autoFocus type="number" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="0.00" min="0" step="0.01" style={{ ...S.input, marginBottom: "18px", fontSize: "20px", fontWeight: 700 }} />
         <button onClick={submit} disabled={!amount || parseFloat(amount) <= 0} style={{ ...S.btn, marginTop: 0, opacity: amount && parseFloat(amount) > 0 ? 1 : 0.4 }}>
@@ -247,7 +391,6 @@ function MapScreen() {
       link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
       document.head.appendChild(link);
     }
-
     const loadLeaflet = () => new Promise((resolve) => {
       if (window.L) return resolve(window.L);
       const script = document.createElement("script");
@@ -255,7 +398,6 @@ function MapScreen() {
       script.onload = () => resolve(window.L);
       document.head.appendChild(script);
     });
-
     const initMap = async (lat, lng) => {
       const L = await loadLeaflet();
       if (!mapRef.current || mapInstanceRef.current) return;
@@ -269,7 +411,6 @@ function MapScreen() {
       setStatus("success");
       setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
     };
-
     if (!navigator.geolocation) { setStatus("error"); return; }
     navigator.geolocation.getCurrentPosition((pos) => initMap(pos.coords.latitude, pos.coords.longitude), () => setStatus("denied"));
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
@@ -342,31 +483,97 @@ function ProfileScreen({ userName }) {
           )}
           <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "4px", fontFamily: "monospace" }}>student@university.edu</div>
         </div>
-
         <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ACCOUNT</div>
         <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
           <SettingRow icon="🔒" label="Change Password" sublabel="Last changed 30 days ago"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
           <SettingRow icon="📧" label="Change Email" sublabel="student@university.edu"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
           <SettingRow icon="🎓" label="University" sublabel="Not set"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
         </div>
-
         <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>PREFERENCES</div>
         <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
           <SettingRow icon="🔔" label="Deal Notifications" sublabel="Get alerted on new nearby deals"><ToggleSwitch value={notifications} onChange={setNotifications} /></SettingRow>
           <SettingRow icon="📍" label="Location Sharing" sublabel="Needed for nearby deals"><ToggleSwitch value={locationSharing} onChange={setLocationSharing} /></SettingRow>
           <SettingRow icon="🌙" label="Dark Mode" sublabel="Always on (recommended)"><ToggleSwitch value={darkMode} onChange={setDarkMode} /></SettingRow>
         </div>
-
         <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ABOUT</div>
         <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
           <SettingRow icon="ℹ️" label="App Version" sublabel="v1.0.0 — StudentSteals"><div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700 }}>Latest</div></SettingRow>
           <SettingRow icon="⭐" label="Rate the App" sublabel="Help us improve"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
           <SettingRow icon="💬" label="Send Feedback" sublabel=""><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
         </div>
-
         <button style={{ width: "100%", padding: "14px", borderRadius: "14px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>
           Sign Out
         </button>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+// BANK LOGIN FORM
+// -------------------------------------------------------------------
+function BankLoginForm({ bankName, onSubmit, onClose }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [accountNum, setAccountNum] = useState("");
+  const [routingNum, setRoutingNum] = useState("");
+  const [accountType, setAccountType] = useState("checking");
+  const [showPass, setShowPass] = useState(false);
+  const canSubmit = username.trim() && password.trim() && accountNum.length === 4 && routingNum.length === 9;
+
+  const fieldStyle = { background: "#0d0d1a", border: "1px solid #1e1e3a", borderRadius: "12px", padding: "11px 14px", color: "#fff", fontSize: "13px", fontFamily: "'Syne', sans-serif", outline: "none", width: "100%", boxSizing: "border-box" };
+  const labelStyle = { color: "#ffffff66", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" };
+
+  return (
+    <div style={{ maxHeight: "520px", overflowY: "auto", scrollbarWidth: "none" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+        <div>
+          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Sign in to {bankName}</div>
+          <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "2px" }}>Enter your online banking credentials</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff44", fontSize: "22px", cursor: "pointer" }}>×</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "20px", marginTop: "6px" }}>
+        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4ade80" }} />
+        <div style={{ color: "#4ade8088", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>SECURED BY PLAID · READ-ONLY ACCESS</div>
+      </div>
+
+      <div style={labelStyle}>ONLINE BANKING USERNAME</div>
+      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter username" autoComplete="off" style={{ ...fieldStyle, marginBottom: "12px" }} />
+
+      <div style={labelStyle}>PASSWORD</div>
+      <div style={{ position: "relative", marginBottom: "12px" }}>
+        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" type={showPass ? "text" : "password"} style={{ ...fieldStyle, paddingRight: "40px" }} />
+        <button onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#ffffff44", cursor: "pointer", fontSize: "14px" }}>
+          {showPass ? "🙈" : "👁️"}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+        <div style={{ flex: 1 }}>
+          <div style={labelStyle}>ACCOUNT NUMBER (last 4)</div>
+          <input value={accountNum} onChange={(e) => setAccountNum(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))} placeholder="••••" maxLength={4} style={{ ...fieldStyle, letterSpacing: "6px", fontSize: "16px" }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={labelStyle}>ROUTING NUMBER</div>
+          <input value={routingNum} onChange={(e) => setRoutingNum(e.target.value.replace(/[^0-9]/g, "").slice(0, 9))} placeholder="9 digits" maxLength={9} style={{ ...fieldStyle, fontSize: "13px" }} />
+        </div>
+      </div>
+
+      <div style={labelStyle}>ACCOUNT TYPE</div>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+        {["checking", "savings"].map((type) => (
+          <button key={type} onClick={() => setAccountType(type)} style={{ flex: 1, padding: "10px", borderRadius: "12px", border: `1px solid ${accountType === type ? "#4ade80" : "#1e1e3a"}`, background: accountType === type ? "#4ade8018" : "#0d0d1a", color: accountType === type ? "#4ade80" : "#ffffff44", fontWeight: 700, fontSize: "12px", cursor: "pointer", fontFamily: "'Syne', sans-serif", textTransform: "capitalize" }}>
+            {type === "checking" ? "🏧 Checking" : "🏦 Savings"}
+          </button>
+        ))}
+      </div>
+
+      <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#1e1e3a", border: "none", borderRadius: "14px", padding: "13px 20px", color: canSubmit ? "#080810" : "#ffffff33", fontWeight: 700, fontSize: "13px", cursor: canSubmit ? "pointer" : "default", fontFamily: "'Syne', sans-serif", width: "100%" }}>
+        Connect Account →
+      </button>
+      <div style={{ textAlign: "center", color: "#ffffff22", fontSize: "10px", marginTop: "10px" }}>
+        🔒 Your credentials are encrypted and never stored
       </div>
     </div>
   );
@@ -453,21 +660,13 @@ function CoachTab({ spending }) {
     setLoading(true);
     try {
       navigator.geolocation.getCurrentPosition(async (pos) => {
-        const res = await fetch(`${BACKEND_URL}/coach`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: userMsg, spending: spending, lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        });
+        const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending, lat: pos.coords.latitude, lng: pos.coords.longitude }) });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
         setLoading(false);
       }, async () => {
-        const res = await fetch(`${BACKEND_URL}/coach`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: userMsg, spending: spending }),
-        });
+        const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending }) });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
@@ -516,28 +715,69 @@ function CoachTab({ spending }) {
 // -------------------------------------------------------------------
 // BUDGET TAB
 // -------------------------------------------------------------------
-function BudgetTab({ budgets, spending, onAddPurchase }) {
+function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
   const [swaps, setSwaps] = useState(null);
   const [loadingSwaps, setLoadingSwaps] = useState(false);
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [bankConnected, setBankConnected] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginStep, setLoginStep] = useState("form"); // "form" | "loading" | "syncing"
+  const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "done"
+  const [syncedTransactions, setSyncedTransactions] = useState([]);
 
-  // Simulate bank sync: populate spending with realistic dummy data (40–90% of each budget)
-  const connectBank = (bankName) => {
+  // ── BANK SYNC WITH AI CATEGORIZATION ──────────────────────────────
+  const connectBank = async (bankName) => {
     setShowBankModal(false);
-    setSyncing(true);
-    setTimeout(() => {
-      const dummySpending = {};
-      Object.keys(budgets).forEach((cat) => {
-        const budget = budgets[cat];
-        dummySpending[cat] = parseFloat((budget * (0.4 + Math.random() * 0.5)).toFixed(2));
+    setSelectedBank(bankName);
+    setShowLoginModal(true);
+    setLoginStep("form");
+  };
+
+  const submitBankLogin = async () => {
+    setLoginStep("loading");
+    await new Promise((r) => setTimeout(r, 2200));
+    setLoginStep("syncing");
+    await new Promise((r) => setTimeout(r, 1800));
+    setShowLoginModal(false);
+    setSyncStatus("syncing");
+    setSyncedTransactions([]);
+    const bankName = selectedBank;
+
+    try {
+      // 1. Load purchases from the txt file
+      const allPurchases = await loadPurchases();
+
+      // 2. Pick a random slice of 12–18 purchases to simulate a month
+      const shuffled = allPurchases.sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, 18);
+
+      // 3. Categorize locally using keyword matching
+      const userCategories = Object.keys(budgets);
+      const categorized = categorizeAllAtOnce(selected, userCategories);
+
+      // Show them appearing one by one visually
+      for (const item of categorized) {
+        setSyncedTransactions((prev) => [...prev, item]);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      // 5. Tally up totals per category (including "Other")
+      const totals = {};
+      categorized.forEach(({ category, amount }) => {
+        totals[category] = (totals[category] || 0) + amount;
       });
-      onAddPurchase("_replace", dummySpending);
-      setSyncing(false);
+
+      // 5. Send to parent to update spending state
+      onBankSync(totals, bankName);
       setBankConnected(bankName);
-    }, 2500);
+      setSyncStatus("done");
+
+    } catch (e) {
+      console.error("Bank sync failed:", e);
+      setSyncStatus(null);
+    }
   };
 
   const fetchSwaps = async () => {
@@ -550,8 +790,9 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
   };
 
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
+  const otherSpent = spending["Other"] || 0;
   const totalSpent = Object.values(spending).reduce((a, b) => a + b, 0);
-  const moneyLeft = totalBudget - totalSpent;
+  const moneyLeft = totalBudget - (totalSpent - otherSpent); // "Other" doesn't count against budget
   const isOverall = moneyLeft < 0;
   const categories = Object.keys(budgets);
   const now = new Date();
@@ -572,7 +813,7 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
         </div>
       </div>
 
-      {/* Category bars */}
+      {/* User budget category bars */}
       {categories.map((key) => {
         const amount = spending[key] || 0;
         const budget = budgets[key];
@@ -592,6 +833,46 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
         );
       })}
 
+      {/* "Other" category — only shown if AI put anything there */}
+
+
+      {/* "Other" category — only shown if anything landed there */}
+      {(spending["Other"] || 0) > 0 && (
+        <div style={{ marginBottom: "14px", paddingTop: "10px", borderTop: "1px dashed #1e1e3a" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+            <span style={{ color: "#ffffff66", fontWeight: 600, fontSize: "13px" }}>Other <span style={{ fontSize: "10px", color: "#ffffff33", fontWeight: 400 }}>(uncategorized)</span></span>
+            <span style={{ fontSize: "12px", color: "#ffffff44" }}>${(spending["Other"] || 0).toFixed(2)}</span>
+          </div>
+          <div style={{ background: "#13132a", borderRadius: "100px", height: "7px" }}>
+            <div style={{ width: "100%", height: "100%", borderRadius: "100px", background: "#ffffff22" }} />
+          </div>
+          {syncedTransactions.filter((t) => t.category === "Other").map((t, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
+              <span style={{ color: "#ffffff33", fontSize: "11px" }}>· {t.name}</span>
+              <span style={{ color: "#ffffff33", fontSize: "11px" }}>${t.amount.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Syncing UI — live transaction feed */}
+      {syncStatus === "syncing" && (
+        <div style={{ background: "#13132a", border: "1px solid #4ade8033", borderRadius: "16px", padding: "14px", marginBottom: "12px" }}>
+          <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700, marginBottom: "10px" }}>
+            📡 Syncing transactions...
+          </div>
+          {syncedTransactions.map((t, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #1e1e3a11", animation: "fadeIn 0.3s ease" }}>
+              <div>
+                <span style={{ color: "#fff", fontSize: "12px" }}>{t.name}</span>
+                <span style={{ color: "#4ade8077", fontSize: "10px", marginLeft: "8px" }}>→ {t.category}</span>
+              </div>
+              <span style={{ color: "#ffffff55", fontSize: "12px" }}>-${t.amount.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Bank connect / connected badge */}
       {!bankConnected ? (
         <button onClick={() => setShowBankModal(true)} style={{ width: "100%", padding: "13px", borderRadius: "14px", marginBottom: "10px", background: "linear-gradient(135deg, #13132a, #1a1a2e)", border: "1px solid #4ade8055", color: "#4ade80", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
@@ -601,15 +882,11 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
         <div style={{ background: "#13132a", border: "1px solid #4ade8033", borderRadius: "14px", padding: "12px 14px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700 }}>🏦 {bankConnected}</div>
-            <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>Synced just now · transactions auto-imported</div>
+            <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>
+              {syncedTransactions.length} transactions synced · AI categorized
+            </div>
           </div>
           <div style={{ color: "#4ade80", fontSize: "18px" }}>✓</div>
-        </div>
-      )}
-
-      {syncing && (
-        <div style={{ textAlign: "center", color: "#4ade80", padding: "10px 0 4px", fontSize: "12px", fontWeight: 600 }}>
-          📡 Syncing transactions from your bank...
         </div>
       )}
 
@@ -637,6 +914,33 @@ function BudgetTab({ budgets, spending, onAddPurchase }) {
 
       {/* Modals */}
       {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
+
+      {showLoginModal && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.95)", display: "flex", alignItems: "flex-end", zIndex: 300, borderRadius: "44px" }}>
+          <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "28px 20px 36px", border: "1px solid #1e1e3a" }}>
+            {loginStep === "form" && <BankLoginForm bankName={selectedBank} onSubmit={submitBankLogin} onClose={() => setShowLoginModal(false)} />}
+            {loginStep === "loading" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
+                <div style={{ fontSize: "36px", marginBottom: "16px" }}>🔐</div>
+                <div style={{ color: "#fff", fontSize: "15px", fontWeight: 800, marginBottom: "8px" }}>Verifying credentials...</div>
+                <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "24px" }}>Connecting to {selectedBank}</div>
+                <div style={{ width: "100%", height: "4px", background: "#1e1e3a", borderRadius: "100px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", background: "linear-gradient(90deg, #4ade80, #22c55e)", borderRadius: "100px", animation: "loadbar 2.2s ease forwards", width: "0%" }} />
+                </div>
+                <style>{`@keyframes loadbar { from { width: 0% } to { width: 100% } }`}</style>
+              </div>
+            )}
+            {loginStep === "syncing" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
+                <div style={{ fontSize: "36px", marginBottom: "16px" }}>🏦</div>
+                <div style={{ color: "#4ade80", fontSize: "15px", fontWeight: 800, marginBottom: "8px" }}>Connected!</div>
+                <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "6px" }}>Fetching your transactions...</div>
+                <div style={{ color: "#ffffff22", fontSize: "11px" }}>256-bit encrypted · read-only access</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showBankModal && (
         <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.92)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "44px" }}>
@@ -677,11 +981,18 @@ export default function DormDeal() {
   };
 
   const handleAddPurchase = (category, amount) => {
-    if (category === "_replace") {
-      setSpending(amount); // bank sync — replace entire spending object
-    } else {
-      setSpending((prev) => ({ ...prev, [category]: (prev[category] || 0) + amount }));
-    }
+    setSpending((prev) => ({ ...prev, [category]: (prev[category] || 0) + amount }));
+  };
+
+  // Called after bank sync — merges AI-categorized totals into spending
+  const handleBankSync = (totals) => {
+    setSpending((prev) => {
+      const merged = { ...prev };
+      Object.entries(totals).forEach(([cat, amt]) => {
+        merged[cat] = (merged[cat] || 0) + amt;
+      });
+      return merged;
+    });
   };
 
   const hour = new Date().getHours();
@@ -692,11 +1003,6 @@ export default function DormDeal() {
       <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
       <div style={{ ...S.phone, position: "relative" }}>
-        <div style={S.statusBar}>
-          <span>9:41</span>
-          <span style={{ color: "#4ade80", fontWeight: 700, letterSpacing: "1px", fontSize: "10px" }}>StudentSteals</span>
-          <span>●●●</span>
-        </div>
 
         {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen /></div>}
 
@@ -726,11 +1032,17 @@ export default function DormDeal() {
                 ))}
               </div>
             </div>
-
             <div style={S.scrollArea}>
               {tab === "deals" && <DealsTab />}
               {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
-              {tab === "budget" && budgets && <BudgetTab budgets={budgets} spending={spending} onAddPurchase={handleAddPurchase} />}
+              {tab === "budget" && budgets && (
+                <BudgetTab
+                  budgets={budgets}
+                  spending={spending}
+                  onAddPurchase={handleAddPurchase}
+                  onBankSync={handleBankSync}
+                />
+              )}
             </div>
           </>
         )}

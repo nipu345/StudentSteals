@@ -1,0 +1,109 @@
+Chipotle burrito bowl | 12.85
+Starbucks latte | 6.45
+Uber ride to campus | 8.20
+Amazon Prime monthly | 14.99
+Spotify Premium | 5.99
+Target groceries run | 43.12
+Whole Foods salad bar | 9.60
+Netflix subscription | 15.49
+Campus bookstore textbook | 67.00
+Dominos pizza | 18.75
+Panera Bread sandwich | 11.20
+Shell gas station | 34.00
+CVS pharmacy | 12.40
+Trader Joes grocery haul | 38.55
+Lyft to airport | 24.10
+McDonald's meal | 9.35
+Subway footlong | 10.50
+Google One storage plan | 2.99
+Dunkin coffee and bagel | 7.80
+Campus vending machine | 2.50
+Ramen noodles bulk pack | 14.20
+IKEA desk lamp | 22.99
+Apple App Store purchase | 4.99
+Walgreens toiletries | 16.75
+Planet Fitness membership | 25.00
+Five Guys burger | 14.60
+Wendys combo meal | 8.90
+H&M clothing | 34.50
+Campus dining hall | 11.00
+Instacart delivery fee | 6.99
+Parking meter | 3.50
+Smoothie King | 9.25
+Chick-fil-A | 11.85
+Kroger grocery run | 52.30
+Buffalo Wild Wings | 22.40
+Laundromat | 7.00
+Dollar Tree supplies | 15.00
+Taco Bell late night | 8.45
+Hulu subscription | 7.99
+Costco bulk groceries | 61.80
+Panda Express | 10.90
+Used textbook eBay | 28.00
+Campus coffee cart | 4.50
+Airpods case replacement | 19.99
+Sephora skincare | 38.00
+Chegg subscription | 14.95
+Adobe Creative Cloud | 19.99
+Postmates delivery | 16.30
+Jersey Mikes sub | 12.75
+Local pizza place | 15.00
+Uber Eats delivery fee | 5.99
+Safeway grocery run | 29.80
+Duck Donuts | 8.20
+Barnes and Noble | 24.00
+Lyft shared ride | 6.40
+Crumbl cookie | 14.50
+GrubHub order | 21.65
+Sprint phone bill | 45.00
+Electric bill split | 38.00
+Roommate groceries split | 27.50
+Foot Locker sneakers | 89.99
+Shein clothing haul | 42.00
+Local bar tab | 35.00
+Movie theater ticket | 14.50
+Discord Nitro | 9.99
+YouTube Premium | 13.99
+Gym day pass | 10.00
+Campus printer credits | 5.00
+7-Eleven snacks | 6.30
+Wingstop | 17.20
+Jamba Juice | 8.75
+Parking garage | 12.00
+Venmo friend for dinner | 18.00
+Chipotle chips and guac | 4.25
+Aldi grocery run | 22.40
+Walgreens cold medicine | 9.80
+Coursera online course | 49.00
+Zoom Pro subscription | 14.99
+Campus snack bar | 5.50
+Hot Topic | 28.00
+Old Navy jeans | 44.00
+UPS shipping | 11.25
+FedEx package | 14.00
+Local diner breakfast | 13.40
+IHOP weekend brunch | 16.80
+Waffle House | 9.20
+Boba tea shop | 7.50
+Wing Stop delivery | 19.95
+Study snacks CVS | 8.60
+Bath and Body Works | 26.00
+Bike repair shop | 30.00
+Campus tech store cable | 12.00
+Dropbox Plus | 9.99
+Notion Pro | 8.00
+LinkedIn Learning | 19.99
+Grammarly Premium | 12.00
+Red Bull energy drinks | 14.40
+protein powder GNC | 39.99
+Gym supplement store | 28.50
+Vitamin C supplements | 8.99
+Multivitamin pack | 14.50
+Melatonin sleep aid | 9.99
+Ibuprofen Advil | 7.49
+Tylenol pain relief | 8.25
+Zinc supplements | 6.99
+Iron supplement | 11.00
+Allergy medicine Zyrtec | 13.49
+NyQuil cold medicine | 10.99
+Vitamin D3 | 7.99
