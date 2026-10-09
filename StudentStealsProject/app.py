@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Comma-separated list of sites allowed to call this API, e.g. https://studentsteals.vercel.app
+CORS(app, origins=os.getenv("ALLOWED_ORIGINS", "*").split(","))
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_NAME = "gemini-3.8-flash"
@@ -43,6 +44,34 @@ MAX_DEALS = 30
 TIP_BATCH = 10
 CACHE_SECONDS = 600
 _deals_cache = {}  # (lat, lng, radius) rounded to ~100 m -> (timestamp, response)
+
+# The public demo runs on our own API keys, so cap how often anyone can call the paid APIs.
+# (max requests, window in seconds) per visitor
+RATE_LIMITS = {"/deals": (10, 3600), "/coach": (30, 3600), "/insights": (20, 3600)}
+DAILY_PLACES_SEARCHES = 60  # uncached /deals requests per day across all visitors
+_hits = {}  # key -> list of request timestamps
+
+
+def over_limit(key, max_hits, window):
+    now = time.time()
+    hits = [t for t in _hits.get(key, []) if now - t < window]
+    if len(hits) >= max_hits:
+        _hits[key] = hits
+        return True
+    hits.append(now)
+    _hits[key] = hits
+    return False
+
+
+@app.before_request
+def rate_limit():
+    limit = RATE_LIMITS.get(request.path)
+    if request.method != "POST" or not limit:
+        return None
+    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+    if over_limit((ip, request.path), *limit):
+        return jsonify({"error": "You're going a little fast. Try again in a few minutes."}), 429
+    return None
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -151,6 +180,9 @@ def get_deals():
     cached = _deals_cache.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_SECONDS:
         return jsonify(cached[1])
+
+    if over_limit("places-daily", DAILY_PLACES_SEARCHES, 86400):
+        return jsonify({"error": "The demo has hit its daily search limit. Try again tomorrow."}), 429
 
     try:
         found = search_nearby(lat, lng, radius, list(DEAL_TYPES))[:MAX_DEALS]
@@ -303,4 +335,5 @@ def health():
     return jsonify({"status": "ok", "service": "StudentSteals API"})
 
 if __name__ == "__main__":
-    app.run(port=8080, debug=True)
+    # Local development server. In production this runs under gunicorn instead (see README).
+    app.run(port=int(os.getenv("PORT", 8080)), debug=os.getenv("FLASK_DEBUG", "1") == "1")

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
-const BACKEND_URL = "http://localhost:8080";
+// Set REACT_APP_BACKEND_URL when deploying; falls back to the local Flask server
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8080";
 const DEAL_RADIUS_M = 1500;
 
 const CATEGORY_META = {
@@ -21,7 +22,11 @@ const money = (n) => `$${n.toFixed(2)}`;
 
 // Turns "Failed to fetch" into something a person can act on
 function friendlyError(e) {
-  if (e instanceof TypeError) return "Can't reach the StudentSteals server. Is app.py running on port 8080?";
+  if (e instanceof TypeError) {
+    return BACKEND_URL.includes("localhost")
+      ? "Can't reach the StudentSteals server. Is app.py running on port 8080?"
+      : "The StudentSteals server is waking up. Give it 30 seconds and try again.";
+  }
   return e.message || "Something went wrong.";
 }
 
@@ -1023,6 +1028,9 @@ export default function StudentSteals() {
     transactions.forEach(({ category, amount }) => { totals[category] = (totals[category] || 0) + amount; });
     return totals;
   }, [budgets, transactions]);
+
+  // Free hosting puts the server to sleep when idle, so wake it as soon as the page opens
+  useEffect(() => { fetch(`${BACKEND_URL}/health`).catch(() => {}); }, []);
 
   const findDeals = useCallback(() => {
     if (!navigator.geolocation) { setDealsError("Your browser doesn't support location."); return; }
