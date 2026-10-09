@@ -204,3 +204,111 @@ input[type="number"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------
+   Cards and loading placeholders
+--------------------------------------------------------------- */
+.ss-card-hover {
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.ss-card-hover:hover {
+  transform: translateY(-1px);
+  border-color: #4ade8055 !important;
+}
+
+@keyframes ss-shimmer {
+  from {
+    background-position: -300px 0;
+  }
+  to {
+    background-position: 300px 0;
+  }
+}
+
+.ss-skeleton {
+  border-radius: 18px;
+  background: linear-gradient(90deg, #13132a 0, #1c1c3a 50%, #13132a 100%);
+  background-size: 600px 100%;
+  animation: ss-shimmer 1.3s linear infinite;
+}
+
+/* ---------------------------------------------------------------
+   Map
+--------------------------------------------------------------- */
+.ss-map.leaflet-container {
+  background: #0d0d1a;
+  font-family: inherit;
+}
+
+/* Turn the light OpenStreetMap tiles into a dark map */
+.ss-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.5);
+}
+
+.ss-map .leaflet-control-attribution {
+  background: rgba(13, 13, 26, 0.75);
+  color: #ffffff66;
+  font-size: 9px;
+}
+.ss-map .leaflet-control-attribution a {
+  color: #4ade80aa;
+}
+
+.ss-map .leaflet-popup-content-wrapper,
+.ss-map .leaflet-popup-tip {
+  background: #13132a;
+  color: #e2e8f0;
+  border: 1px solid #1e1e3a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.ss-map .leaflet-popup-content {
+  margin: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ss-map a.leaflet-popup-close-button {
+  color: #ffffff66;
+}
+
+.ss-pin {
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  background: #13132a;
+  border: 2px solid var(--pin);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 12px color-mix(in srgb, var(--pin) 40%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  transition: transform 0.15s ease;
+}
+.ss-pin:hover {
+  transform: rotate(-45deg) scale(1.12);
+}
+/* Keep the emoji upright inside the rotated pin */
+.ss-pin > span {
+  transform: rotate(45deg);
+  line-height: 1;
+}
+
+@keyframes ss-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(74, 222, 128, 0);
+  }
+}
+
+.ss-user-dot {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: #4ade80;
+  border: 3px solid #fff;
+  animation: ss-pulse 1.8s ease-out infinite;
+}

@@ -1,8 +1,34 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
 const BACKEND_URL = "http://localhost:8080";
+const DEAL_RADIUS_M = 1500;
+
+const CATEGORY_META = {
+  food: { label: "Food", color: "#fb923c" },
+  coffee: { label: "Coffee", color: "#e0b07a" },
+  groceries: { label: "Groceries", color: "#4ade80" },
+  books: { label: "Books", color: "#60a5fa" },
+  fitness: { label: "Fitness", color: "#f472b6" },
+  entertainment: { label: "Fun", color: "#a78bfa" },
+};
+const categoryMeta = (c) => CATEGORY_META[c] || { label: c.charAt(0).toUpperCase() + c.slice(1), color: "#94a3b8" };
+
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+// Turns "Failed to fetch" into something a person can act on
+function friendlyError(e) {
+  if (e instanceof TypeError) return "Can't reach the StudentSteals server. Is app.py running on port 8080?";
+  return e.message || "Something went wrong.";
+}
+
+async function postJSON(path, body) {
+  const res = await fetch(`${BACKEND_URL}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `Server error (${res.status})`);
+  return data;
+}
 // -------------------------------------------------------------------
 // LOAD PURCHASES from purchases.txt (in /public folder)
 // -------------------------------------------------------------------
@@ -173,17 +199,21 @@ const S = {
     marginBottom: "10px",
     border: "1px solid #1e1e3a",
   },
-  pill: (active) => ({
-    padding: "5px 14px",
+  label: { color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" },
+  muted: { color: "#ffffff55", fontSize: "11px" },
+  pill: (active, color = "#4ade80") => ({
+    padding: "6px 12px",
     borderRadius: "20px",
-    border: `1px solid ${active ? "#4ade80" : "#1e1e3a"}`,
-    background: active ? "#4ade8018" : "transparent",
-    color: active ? "#4ade80" : "#ffffff33",
+    border: `1px solid ${active ? color : "#1e1e3a"}`,
+    background: active ? `${color}1f` : "transparent",
+    color: active ? color : "#ffffff66",
     fontSize: "11px",
     fontWeight: 700,
     cursor: "pointer",
-    fontFamily: "'Syne', sans-serif",
-    letterSpacing: "0.5px",
+    fontFamily: "inherit",
+    letterSpacing: "0.3px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   tab: (active) => ({
     flex: 1,
@@ -359,97 +389,180 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
 // -------------------------------------------------------------------
 // MAP SCREEN
 // -------------------------------------------------------------------
-function MapScreen({ selectedDeal, deals }) {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef({});
-  const [status, setStatus] = useState("loading");
-  const [coords, setCoords] = useState(null);
-
-  useEffect(() => {
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    const loadLeaflet = () => new Promise((resolve) => {
-      if (window.L) return resolve(window.L);
-      const script = document.createElement("script");
+function loadLeaflet() {
+  return new Promise((resolve, reject) => {
+    if (window.L) return resolve(window.L);
+    let script = document.getElementById("leaflet-js");
+    if (!script) {
+      script = document.createElement("script");
+      script.id = "leaflet-js";
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve(window.L);
       document.head.appendChild(script);
-    });
+    }
+    script.addEventListener("load", () => resolve(window.L));
+    script.addEventListener("error", reject);
+  });
+}
 
-    const initMap = async (lat, lng) => {
-      const L = await loadLeaflet();
-      if (!mapRef.current || mapInstanceRef.current) return;
-      const map = L.map(mapRef.current, { center: [lat, lng], zoom: 15, zoomControl: false });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap © CARTO", maxZoom: 19 }).addTo(map);
+function dealPopupHtml(deal) {
+  const meta = categoryMeta(deal.category);
+  return `<div style="min-width:170px">
+    <div style="color:${meta.color};font-size:9px;font-weight:700;letter-spacing:1px">${escapeHtml(meta.label.toUpperCase())} · ${escapeHtml(deal.distance_label)}</div>
+    <div style="color:#fff;font-weight:800;font-size:13px;margin:2px 0 4px">${escapeHtml(deal.name)}</div>
+    <div style="color:#cbd5e1">${escapeHtml(deal.deal)}</div>
+    <div style="color:#4ade80;font-weight:700;margin-top:6px">💰 Save ${escapeHtml(deal.saving)}</div>
+  </div>`;
+}
 
-      // Green dot for user location
-      const greenDot = L.divIcon({ className: "", html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
-      L.marker([lat, lng], { icon: greenDot }).addTo(map).bindPopup("<b>You are here</b>");
-      mapInstanceRef.current = map;
-      setStatus("success");
-      setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
+function MapScreen({ deals, origin, selectedDeal, onSelectDeal, dealsLoading, onFindDeals }) {
+  const mapEl = useRef(null);
+  const mapRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const dealLayerRef = useRef(null);
+  const markersRef = useRef({});
+  const [status, setStatus] = useState("loading"); // loading | ready | denied | error
+  const [here, setHere] = useState(null);
 
-      // Place markers from already-fetched deals — no extra API call
-      if (deals && deals.length > 0) {
-        deals.forEach((deal) => {
-          const dealIcon = L.divIcon({ className: "", html: `<div style="background:#4ade80;color:#000;padding:4px 6px;border-radius:8px;font-size:12px;font-weight:700;">${deal.emoji}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-          const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon }).addTo(map).bindPopup(`<b>${deal.name}</b><br/>${deal.deal}<br/>💰 Save ${deal.saving}`);
-          markersRef.current[deal.id] = marker;
-        });
-      }
+  // Create the map on the first location fix, then keep the "you" dot live with watchPosition
+  useEffect(() => {
+    let cancelled = false;
+    let watchId = null;
+    if (!navigator.geolocation) { setStatus("denied"); return; }
+
+    loadLeaflet().then((L) => {
+      if (cancelled) return;
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const ll = [pos.coords.latitude, pos.coords.longitude];
+          setHere({ lat: ll[0], lng: ll[1], accuracy: Math.round(pos.coords.accuracy) });
+          if (mapRef.current) { userMarkerRef.current.setLatLng(ll); return; }
+
+          const map = L.map(mapEl.current, { center: ll, zoom: 15, zoomControl: false });
+          // OpenStreetMap tiles, darkened in App.css (CARTO's dark tiles now need an API key)
+          L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 19 }).addTo(map);
+          dealLayerRef.current = L.layerGroup().addTo(map);
+          const userIcon = L.divIcon({ className: "", html: `<div class="ss-user-dot"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+          userMarkerRef.current = L.marker(ll, { icon: userIcon, zIndexOffset: 1000 }).addTo(map).bindPopup("<b>You are here</b>");
+          mapRef.current = map;
+          setStatus("ready");
+        },
+        () => { if (!mapRef.current) setStatus("denied"); },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+      );
+    }).catch(() => !cancelled && setStatus("error"));
+
+    return () => {
+      cancelled = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
-      () => setStatus("denied")
-    );
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
-  // Fly to selected deal — retry until marker is placed on map
+  // Draw the search radius and one pin per deal whenever the deals change
   useEffect(() => {
-    if (!selectedDeal) return;
-    let attempts = 0;
-    const interval = setInterval(() => {
-      const marker = markersRef.current[selectedDeal.id];
-      const map = mapInstanceRef.current;
-      if (marker && map) {
-        map.setView(marker.getLatLng(), 17);
-        marker.openPopup();
-        clearInterval(interval);
-      }
-      if (++attempts > 30) clearInterval(interval); // give up after 3s
-    }, 100);
-    return () => clearInterval(interval);
-  }, [selectedDeal]);
+    const L = window.L;
+    const map = mapRef.current;
+    const layer = dealLayerRef.current;
+    if (status !== "ready" || !L || !map || !layer) return;
+    layer.clearLayers();
+    markersRef.current = {};
+    if (!deals.length) return;
+
+    if (origin) {
+      L.circle([origin.lat, origin.lng], { radius: DEAL_RADIUS_M, color: "#4ade80", weight: 1.5, opacity: 0.6, fillOpacity: 0.05, dashArray: "6 6", interactive: false }).addTo(layer);
+    }
+    deals.forEach((deal) => {
+      const { color } = categoryMeta(deal.category);
+      const icon = L.divIcon({ className: "", html: `<div class="ss-pin" style="--pin:${color}"><span>${deal.emoji}</span></div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+      const marker = L.marker([deal.lat, deal.lng], { icon }).addTo(layer).bindPopup(dealPopupHtml(deal), { offset: [0, -10], maxWidth: 220, autoPanPadding: [16, 16] });
+      marker.on("click", () => onSelectDeal(deal));
+      markersRef.current[deal.id] = marker;
+    });
+    if (!selectedDeal) map.fitBounds(L.featureGroup(Object.values(markersRef.current)).getBounds(), { padding: [30, 30], maxZoom: 16 });
+  }, [deals, origin, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fly to whichever deal was picked from the list, a pin, or the carousel
+  useEffect(() => {
+    const marker = selectedDeal && markersRef.current[selectedDeal.id];
+    if (status !== "ready" || !marker) return;
+    mapRef.current.once("moveend", () => marker.openPopup());
+    mapRef.current.flyTo(marker.getLatLng(), 17, { duration: 0.6 });
+    document.getElementById(`carousel-${selectedDeal.id}`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selectedDeal, deals, status]);
+
+  const recenter = () => here && mapRef.current?.flyTo([here.lat, here.lng], 16, { duration: 0.6 });
+  const ctrlBtn = { width: "36px", height: "36px", borderRadius: "10px", background: "#13132aee", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "inherit" };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
-      <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
-        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Nearby Map</div>
-        {coords && <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "2px", fontFamily: "monospace" }}>📍 {coords.lat}, {coords.lng}</div>}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", minHeight: 0 }}>
+      <div style={{ padding: "14px 20px 12px", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={S.label}>LIVE</div>
+          <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800, whiteSpace: "nowrap" }}>Deals Map</div>
+        </div>
+        <div style={{ textAlign: "right", minWidth: 0 }}>
+          {deals.length > 0 && <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700 }}>{deals.length} deals nearby</div>}
+          {here && <div style={{ ...S.muted, fontFamily: "monospace", fontSize: "10px" }}>📍 {here.lat.toFixed(3)}, {here.lng.toFixed(3)} ±{here.accuracy}m</div>}
+        </div>
       </div>
       <div style={{ flex: 1, position: "relative", margin: "0 12px 12px", borderRadius: "20px", overflow: "hidden", border: "1px solid #1e1e3a" }}>
-        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
-        {status === "loading" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📡</div><div style={{ color: "#4ade80", fontSize: "13px", fontWeight: 700 }}>Finding your location...</div></div>}
-        {status === "denied" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "24px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📍</div><div style={{ color: "#f87171", fontSize: "13px", fontWeight: 700, textAlign: "center" }}>Location access denied</div></div>}
-        {status === "success" && mapInstanceRef.current && (
-          <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: "4px", zIndex: 1000 }}>
-            {["+", "−"].map((label, i) => <button key={i} onClick={() => i === 0 ? mapInstanceRef.current.zoomIn() : mapInstanceRef.current.zoomOut()} style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{label}</button>)}
-          </div>
+        <div ref={mapEl} className="ss-map" style={{ width: "100%", height: "100%" }} />
+
+        {status === "loading" && <MapNotice icon="📡" text="Finding your location..." />}
+        {status === "denied" && <MapNotice icon="📍" text="Location access is off" sub="Allow location in your browser to see deals around you." error />}
+        {status === "error" && <MapNotice icon="🗺️" text="Couldn't load the map" sub="Check your internet connection." error />}
+
+        {status === "ready" && (
+          <>
+            <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: "6px", zIndex: 1000 }}>
+              <button aria-label="Zoom in" onClick={() => mapRef.current.zoomIn()} style={ctrlBtn}>+</button>
+              <button aria-label="Zoom out" onClick={() => mapRef.current.zoomOut()} style={ctrlBtn}>−</button>
+              <button aria-label="Recenter on me" onClick={recenter} style={{ ...ctrlBtn, fontSize: "16px" }}>◎</button>
+            </div>
+
+            {deals.length === 0 && (
+              <div style={{ position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 1000 }}>
+                <button onClick={onFindDeals} disabled={dealsLoading} style={{ ...S.btn, marginTop: 0, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", opacity: dealsLoading ? 0.7 : 1 }}>
+                  {dealsLoading ? "Finding deals near you..." : "🎯 Find deals around me"}
+                </button>
+              </div>
+            )}
+
+            {deals.length > 0 && (
+              <div className="ss-scroll" style={{ position: "absolute", left: 0, right: 0, bottom: 10, zIndex: 1000, display: "flex", gap: "8px", overflowX: "auto", padding: "0 12px", scrollSnapType: "x mandatory" }}>
+                {deals.map((deal) => {
+                  const active = selectedDeal?.id === deal.id;
+                  const { color } = categoryMeta(deal.category);
+                  return (
+                    <div key={deal.id} id={`carousel-${deal.id}`} onClick={() => onSelectDeal(deal)} style={{ flex: "0 0 210px", scrollSnapAlign: "center", background: "#13132af2", border: `1px solid ${active ? color : "#1e1e3a"}`, borderRadius: "14px", padding: "10px 12px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "18px" }}>{deal.emoji}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: "#fff", fontSize: "12px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{deal.name}</div>
+                          <div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700 }}>Save {deal.saving} <span style={{ color: "#ffffff44", fontWeight: 400 }}>· {deal.distance_label}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
-        {status === "success" && <button onClick={() => { navigator.geolocation.getCurrentPosition((pos) => { mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 15); }); }} style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, background: "#13132a", border: "1px solid #4ade8044", borderRadius: "10px", color: "#4ade80", fontSize: "11px", fontWeight: 700, padding: "8px 12px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>◎ Recenter</button>}
       </div>
     </div>
   );
 }
 
+function MapNotice({ icon, text, sub, error }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", padding: "24px", zIndex: 1001, textAlign: "center" }}>
+      <div style={{ fontSize: "32px" }}>{icon}</div>
+      <div style={{ color: error ? "#f87171" : "#4ade80", fontSize: "13px", fontWeight: 700 }}>{text}</div>
+      {sub && <div style={S.muted}>{sub}</div>}
+    </div>
+  );
+}
 
 // -------------------------------------------------------------------
 // PROFILE SCREEN
@@ -596,69 +709,96 @@ function BankLoginForm({ bankName, onSubmit, onClose }) {
 // -------------------------------------------------------------------
 // DEALS TAB
 // -------------------------------------------------------------------
-function DealsTab({ deals, setDeals, onDealClick }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function DealsTab({ deals, loading, error, origin, onFindDeals, onDealClick }) {
   const [filter, setFilter] = useState("all");
-  const [locationLabel, setLocationLabel] = useState(null);
 
-  const fetchDeals = () => {
-    setLoading(true); setError(null);
-    if (!navigator.geolocation) { setError("Geolocation not supported."); setLoading(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-        try {
-          const res = await fetch(`${BACKEND_URL}/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat: latitude, lng: longitude, radius: 1500 }) });
-          const data = await res.json();
-          if (data.error) throw new Error(data.error);
-          setDeals(data.deals || []);
-        } catch (e) { setError(e.message); } finally { setLoading(false); }
-      },
-      () => { setError("Location access denied."); setLoading(false); }
-    );
-  };
+  // If the browser already has location permission, load deals right away
+  useEffect(() => {
+    if (deals.length || loading || error || !navigator.permissions) return;
+    navigator.permissions.query({ name: "geolocation" }).then((p) => p.state === "granted" && onFindDeals()).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const categories = ["all", ...new Set(deals.map((d) => d.category))];
+  const counts = deals.reduce((acc, d) => ({ ...acc, [d.category]: (acc[d.category] || 0) + 1 }), {});
+  const categories = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const filtered = filter === "all" ? deals : deals.filter((d) => d.category === filter);
+  const openNow = deals.filter((d) => d.open_now).length;
 
   return (
     <div style={{ padding: "0 20px 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-        <div style={{ color: "#ffffff44", fontSize: "11px" }}>{locationLabel ? `📍 ${locationLabel}` : "📍 Locating..."}</div>
-        <button onClick={fetchDeals} style={{ background: "none", border: "none", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>↻ Refresh</button>
-      </div>
-      <div style={{ display: "flex", gap: "6px", marginBottom: "14px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "4px" }}>
-        {categories.map((c) => <button key={c} style={S.pill(filter === c)} onClick={() => setFilter(c)}>{c.charAt(0).toUpperCase() + c.slice(1)}</button>)}
-      </div>
-      {loading && <div style={{ textAlign: "center", color: "#4ade80", padding: "40px 0" }}><div style={{ fontSize: "28px", marginBottom: "8px" }}>📡</div><div style={{ fontSize: "13px" }}>Finding deals near you...</div></div>}
-      {error && <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}><div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div><button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button></div>}
-      {!loading && !error && deals.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
-          <div style={{ color: "#fff", fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}>Find deals near you</div>
-          <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "20px" }}>AI scans real reviews to find you savings</div>
-          <button onClick={fetchDeals} style={{ ...S.btn, width: "auto", padding: "12px 24px", marginTop: 0 }}>🎯 Find Nearby Deals</button>
+      {deals.length > 0 && !loading && (
+        <div className="ss-fade" style={{ background: "linear-gradient(135deg, #13532d55, #15803d18)", border: "1px solid #4ade8033", borderRadius: "18px", padding: "14px 16px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ ...S.label, color: "#86efac" }}>STEALS NEAR YOU</div>
+            <div style={{ color: "#fff", fontSize: "26px", fontWeight: 800, lineHeight: 1.1 }}>{deals.length} <span style={{ fontSize: "13px", color: "#ffffff88", fontWeight: 600 }}>places within 1 mi</span></div>
+            <div style={{ ...S.muted, marginTop: "2px" }}>{openNow} open now{origin && ` · 📍 ${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`}</div>
+          </div>
+          <button onClick={onFindDeals} aria-label="Refresh deals" style={{ background: "#0d0d1a", border: "1px solid #4ade8044", borderRadius: "12px", color: "#4ade80", fontSize: "16px", cursor: "pointer", width: "38px", height: "38px" }}>↻</button>
         </div>
       )}
-      {!loading && !error && deals.length > 0 && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "20px 0", fontSize: "13px" }}>No deals in this category.</div>}
-      {!loading && filtered.map((deal, i) => (
-        <div key={deal.id || i} onClick={() => onDealClick && onDealClick(deal)} style={{ ...S.card, border: "1px solid #4ade8022", cursor: "pointer" }}>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>{deal.name}</div>
-                {deal.deal_found_in_reviews && <span style={{ background: "#4ade8022", color: "#4ade80", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "6px", letterSpacing: "0.5px" }}>FROM REVIEWS</span>}
-              </div>
-              <div style={{ color: "#4ade8099", fontSize: "12px", marginTop: "2px" }}>{deal.deal}</div>
-              <div style={{ color: "#ffffff33", fontSize: "11px", marginTop: "3px" }}>📍 {deal.distance_label} away{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · 🔴 Closed"}</div>
-            </div>
-            <div style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px", flexShrink: 0 }}>-{deal.saving}</div>
-          </div>
+
+      {deals.length > 0 && !loading && (
+        <div className="ss-scroll" style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "2px" }}>
+          <button style={S.pill(filter === "all")} onClick={() => setFilter("all")}>All {deals.length}</button>
+          {categories.map((c) => {
+            const meta = categoryMeta(c);
+            return <button key={c} style={S.pill(filter === c, meta.color)} onClick={() => setFilter(c)}>{meta.label} {counts[c]}</button>;
+          })}
         </div>
-      ))}
+      )}
+
+      {loading && (
+        <div>
+          <div style={{ textAlign: "center", color: "#4ade80", fontSize: "12px", fontWeight: 700, margin: "4px 0 14px" }}>
+            📡 Searching nearby places and writing tips with Gemini...
+          </div>
+          {[0, 1, 2, 3, 4].map((i) => <div key={i} className="ss-skeleton" style={{ height: "74px", marginBottom: "10px", animationDelay: `${i * 0.1}s` }} />)}
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}>
+          <div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div>
+          <button onClick={onFindDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button>
+        </div>
+      )}
+
+      {!loading && !error && deals.length === 0 && (
+        <div className="ss-fade" style={{ textAlign: "center", padding: "36px 0" }}>
+          <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔍</div>
+          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, marginBottom: "6px" }}>Find steals near you</div>
+          <div style={{ color: "#ffffff55", fontSize: "12px", marginBottom: "22px", lineHeight: 1.5, padding: "0 10px" }}>
+            We'll look for cafés, restaurants, grocery stores, bookstores, gyms and theaters within a mile, and Gemini will suggest how to save at each one.
+          </div>
+          <button onClick={onFindDeals} style={{ ...S.btn, width: "auto", padding: "12px 24px", marginTop: 0 }}>🎯 Find Nearby Deals</button>
+        </div>
+      )}
+
+      {!loading && filtered.map((deal, i) => {
+        const meta = categoryMeta(deal.category);
+        const upTo = /^up to /i.test(deal.saving);
+        return (
+          <div key={deal.id} className="ss-fade ss-card-hover" onClick={() => onDealClick(deal)} style={{ ...S.card, cursor: "pointer", animationDelay: `${Math.min(i, 10) * 0.03}s` }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: `${meta.color}1a`, border: `1px solid ${meta.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{deal.name}</div>
+                <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "3px", lineHeight: 1.4 }}>{deal.deal}</div>
+                <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "4px" }}>
+                  <span style={{ color: meta.color }}>{meta.label}</span> · {deal.distance_label}{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · Closed"}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ color: "#ffffff44", fontSize: "9px", fontWeight: 700, letterSpacing: "1px" }}>{upTo ? "SAVE UP TO" : "SAVE"}</div>
+                <div style={{ color: "#4ade80", fontWeight: 800, fontSize: "13px", whiteSpace: "nowrap" }}>{upTo ? deal.saving.slice(6) : deal.saving}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {!loading && deals.length > 0 && (
+        <div style={{ ...S.muted, fontSize: "10px", textAlign: "center", marginTop: "6px" }}>Tips are AI suggestions. Ask in store to confirm discounts.</div>
+      )}
     </div>
   );
 }
@@ -1013,6 +1153,32 @@ export default function DormDeal() {
   const [spending, setSpending] = useState({});
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [deals, setDeals] = useState([]);
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealsError, setDealsError] = useState(null);
+  const [origin, setOrigin] = useState(null);
+
+  const findDeals = useCallback(() => {
+    if (!navigator.geolocation) { setDealsError("Your browser doesn't support location."); return; }
+    setDealsLoading(true);
+    setDealsError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setOrigin(here);
+        try {
+          const data = await postJSON("/deals", { ...here, radius: DEAL_RADIUS_M });
+          setDeals(data.deals || []);
+          setSelectedDeal(null);
+        } catch (e) {
+          setDealsError(friendlyError(e));
+        } finally {
+          setDealsLoading(false);
+        }
+      },
+      () => { setDealsError("Location access denied. Allow location in your browser to find deals."); setDealsLoading(false); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }, []);
 
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
@@ -1055,7 +1221,9 @@ export default function DormDeal() {
 
       <div className="ss-phone">
 
-        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} deals={deals} /></div>}
+        {screen === "map" && (
+          <MapScreen deals={deals} origin={origin} selectedDeal={selectedDeal} onSelectDeal={setSelectedDeal} dealsLoading={dealsLoading} onFindDeals={findDeals} />
+        )}
 
         {screen === "profile" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -1084,7 +1252,7 @@ export default function DormDeal() {
               </div>
             </div>
             <div style={S.scrollArea}>
-              {tab === "deals" && <DealsTab deals={deals} setDeals={setDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
+              {tab === "deals" && <DealsTab deals={deals} loading={dealsLoading} error={dealsError} origin={origin} onFindDeals={findDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
               {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
               {tab === "budget" && budgets && (
                 <BudgetTab
