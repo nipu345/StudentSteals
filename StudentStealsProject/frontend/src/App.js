@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import "./App.css";
 
 const BACKEND_URL = "http://localhost:8080";
-const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
 // -------------------------------------------------------------------
 // LOAD PURCHASES from purchases.txt (in /public folder)
 // -------------------------------------------------------------------
@@ -165,25 +165,6 @@ function categorizeAllAtOnce(purchases, userCategories) {
 // STYLES
 // -------------------------------------------------------------------
 const S = {
-  app: {
-    fontFamily: "'Syne', sans-serif",
-    background: "#080810",
-    minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: "20px",
-  },
-  phone: {
-    width: "375px",
-    height: "800px",
-    background: "#0d0d1a",
-    borderRadius: "44px",
-    overflow: "hidden",
-    boxShadow: "0 0 0 2px #1a1a2e, 0 50px 100px rgba(0,0,0,0.9), 0 0 80px rgba(99,200,100,0.06)",
-    display: "flex",
-    flexDirection: "column",
-  },
   scrollArea: { flex: 1, overflowY: "auto", scrollbarWidth: "none" },
   card: {
     background: "#13132a",
@@ -246,14 +227,14 @@ const S = {
   overlay: {
     position: "absolute",
     inset: 0,
-    background: "rgba(8,8,16,0.92)",
+    background: "rgba(8,8,16,0.97)",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     padding: "30px",
     zIndex: 100,
-    borderRadius: "44px",
+    borderRadius: "inherit",
   },
 };
 
@@ -355,7 +336,7 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
   };
 
   return (
-    <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "44px" }}>
+    <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "inherit" }}>
       <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", border: "1px solid #1e1e3a" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
           <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Add Purchase</div>
@@ -974,7 +955,7 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
       {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
 
       {showLoginModal && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.95)", display: "flex", alignItems: "flex-end", zIndex: 300, borderRadius: "44px" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.95)", display: "flex", alignItems: "flex-end", zIndex: 300, borderRadius: "inherit" }}>
           <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "28px 20px 36px", border: "1px solid #1e1e3a" }}>
             {loginStep === "form" && <BankLoginForm bankName={selectedBank} onSubmit={submitBankLogin} onClose={() => setShowLoginModal(false)} />}
             {loginStep === "loading" && (
@@ -1001,7 +982,7 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
       )}
 
       {showBankModal && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.92)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "44px" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.92)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "inherit" }}>
           <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 36px", border: "1px solid #1e1e3a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
               <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Connect Your Bank</div>
@@ -1059,10 +1040,20 @@ export default function DormDeal() {
   const greeting = hour < 12 ? "GOOD MORNING" : hour < 17 ? "GOOD AFTERNOON" : "GOOD EVENING";
 
   return (
-    <div style={S.app}>
-      <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <div className="ss-stage">
+      <aside className="ss-side">
+        <div className="ss-side-kicker">BUILT AT HACKCU 12</div>
+        <h1>Student<span>Steals</span></h1>
+        <p className="ss-side-lede">The AI money app for college students. Find deals around you and get coaching based on how you actually spend.</p>
+        <ul>
+          <li><span>🗺️</span><div><b>Deals on a live map</b><br />Google Places finds cafés, food, groceries, books, gyms and theaters near you.</div></li>
+          <li><span>🤖</span><div><b>An AI money coach</b><br />Gemini looks at your spending before it gives advice.</div></li>
+          <li><span>📊</span><div><b>Budget tracking</b><br />Set limits, log purchases, and get a plain-English spending report.</div></li>
+        </ul>
+        <div className="ss-side-stack">React · Flask · Google Gemini · Google Places</div>
+      </aside>
 
-      <div style={{ ...S.phone, position: "relative" }}>
+      <div className="ss-phone">
 
         {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} deals={deals} /></div>}
 

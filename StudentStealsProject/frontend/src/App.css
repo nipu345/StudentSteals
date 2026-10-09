@@ -1,38 +1,206 @@
-.App {
-  text-align: center;
+/* ---------------------------------------------------------------
+   Base
+--------------------------------------------------------------- */
+html,
+body {
+  margin: 0;
+  background: #080810;
+  color: #fff;
+  font-family: 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+input::placeholder {
+  color: #ffffff40;
 }
 
-.App-header {
-  background-color: #282c34;
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Hide scrollbars inside the phone but keep scrolling */
+.ss-phone *,
+.ss-scroll {
+  scrollbar-width: none;
+}
+.ss-phone *::-webkit-scrollbar,
+.ss-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------------------------------------------------------------
+   Layout: phone frame, with a side panel on wide screens
+--------------------------------------------------------------- */
+.ss-stage {
   min-height: 100vh;
+  box-sizing: border-box;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  gap: 80px;
+  padding: 24px;
+  background:
+    radial-gradient(900px 500px at 75% 15%, rgba(74, 222, 128, 0.08), transparent 60%),
+    radial-gradient(700px 500px at 10% 90%, rgba(96, 165, 250, 0.05), transparent 60%),
+    #080810;
 }
 
-.App-link {
-  color: #61dafb;
+.ss-phone {
+  position: relative;
+  width: 375px;
+  height: min(800px, calc(100vh - 48px));
+  min-height: 620px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0d0d1a;
+  border-radius: 44px;
+  box-shadow:
+    0 0 0 2px #1a1a2e,
+    0 0 0 10px #0b0b16,
+    0 0 0 11px #1a1a2e,
+    0 50px 100px rgba(0, 0, 0, 0.9),
+    0 0 120px rgba(74, 222, 128, 0.08);
 }
 
-@keyframes App-logo-spin {
+.ss-side {
+  display: none;
+  max-width: 460px;
+}
+
+@media (min-width: 980px) {
+  .ss-side {
+    display: block;
+    animation: ss-fade-in 0.5s ease both;
+  }
+}
+
+.ss-side-kicker {
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+}
+
+.ss-side h1 {
+  margin: 0 0 14px;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ss-side h1 span {
+  color: #4ade80;
+}
+
+.ss-side-lede {
+  margin: 0 0 32px;
+  color: #ffffffaa;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.ss-side ul {
+  list-style: none;
+  margin: 0 0 32px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ss-side li {
+  display: flex;
+  gap: 14px;
+  color: #ffffff77;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ss-side li b {
+  color: #fff;
+  font-size: 14px;
+}
+
+.ss-side li > span {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #13132a;
+  border: 1px solid #1e1e3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.ss-side-stack {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 100px;
+  border: 1px solid #1e1e3a;
+  color: #ffffff66;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* On an actual phone, drop the frame and fill the screen */
+@media (max-width: 500px) {
+  .ss-stage {
+    padding: 0;
+  }
+  .ss-phone {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Motion
+--------------------------------------------------------------- */
+@keyframes ss-fade-in {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(6px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ss-fade {
+  animation: ss-fade-in 0.35s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
