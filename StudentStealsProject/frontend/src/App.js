@@ -1,8 +1,32 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
 const BACKEND_URL = "http://localhost:8080";
+const DEAL_RADIUS_M = 1500;
+
+const CATEGORY_META = {
+  food: { label: "Food", color: "#fb923c" },
+  coffee: { label: "Coffee", color: "#e0b07a" },
+  groceries: { label: "Groceries", color: "#4ade80" },
+  books: { label: "Books", color: "#60a5fa" },
+  fitness: { label: "Fitness", color: "#f472b6" },
+  entertainment: { label: "Fun", color: "#a78bfa" },
+};
+const categoryMeta = (c) => CATEGORY_META[c] || { label: c.charAt(0).toUpperCase() + c.slice(1), color: "#94a3b8" };
+
+// Turns "Failed to fetch" into something a person can act on
+function friendlyError(e) {
+  if (e instanceof TypeError) return "Can't reach the StudentSteals server. Is app.py running on port 8080?";
+  return e.message || "Something went wrong.";
+}
+
+async function postJSON(path, body) {
+  const res = await fetch(`${BACKEND_URL}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `Server error (${res.status})`);
+  return data;
+}
 // -------------------------------------------------------------------
 // LOAD PURCHASES from purchases.txt (in /public folder)
 // -------------------------------------------------------------------
@@ -173,17 +197,21 @@ const S = {
     marginBottom: "10px",
     border: "1px solid #1e1e3a",
   },
-  pill: (active) => ({
-    padding: "5px 14px",
+  label: { color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" },
+  muted: { color: "#ffffff55", fontSize: "11px" },
+  pill: (active, color = "#4ade80") => ({
+    padding: "6px 12px",
     borderRadius: "20px",
-    border: `1px solid ${active ? "#4ade80" : "#1e1e3a"}`,
-    background: active ? "#4ade8018" : "transparent",
-    color: active ? "#4ade80" : "#ffffff33",
+    border: `1px solid ${active ? color : "#1e1e3a"}`,
+    background: active ? `${color}1f` : "transparent",
+    color: active ? color : "#ffffff66",
     fontSize: "11px",
     fontWeight: 700,
     cursor: "pointer",
-    fontFamily: "'Syne', sans-serif",
-    letterSpacing: "0.5px",
+    fontFamily: "inherit",
+    letterSpacing: "0.3px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   tab: (active) => ({
     flex: 1,
@@ -596,69 +624,96 @@ function BankLoginForm({ bankName, onSubmit, onClose }) {
 // -------------------------------------------------------------------
 // DEALS TAB
 // -------------------------------------------------------------------
-function DealsTab({ deals, setDeals, onDealClick }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function DealsTab({ deals, loading, error, origin, onFindDeals, onDealClick }) {
   const [filter, setFilter] = useState("all");
-  const [locationLabel, setLocationLabel] = useState(null);
 
-  const fetchDeals = () => {
-    setLoading(true); setError(null);
-    if (!navigator.geolocation) { setError("Geolocation not supported."); setLoading(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-        try {
-          const res = await fetch(`${BACKEND_URL}/deals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat: latitude, lng: longitude, radius: 1500 }) });
-          const data = await res.json();
-          if (data.error) throw new Error(data.error);
-          setDeals(data.deals || []);
-        } catch (e) { setError(e.message); } finally { setLoading(false); }
-      },
-      () => { setError("Location access denied."); setLoading(false); }
-    );
-  };
+  // If the browser already has location permission, load deals right away
+  useEffect(() => {
+    if (deals.length || loading || error || !navigator.permissions) return;
+    navigator.permissions.query({ name: "geolocation" }).then((p) => p.state === "granted" && onFindDeals()).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const categories = ["all", ...new Set(deals.map((d) => d.category))];
+  const counts = deals.reduce((acc, d) => ({ ...acc, [d.category]: (acc[d.category] || 0) + 1 }), {});
+  const categories = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const filtered = filter === "all" ? deals : deals.filter((d) => d.category === filter);
+  const openNow = deals.filter((d) => d.open_now).length;
 
   return (
     <div style={{ padding: "0 20px 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-        <div style={{ color: "#ffffff44", fontSize: "11px" }}>{locationLabel ? `📍 ${locationLabel}` : "📍 Locating..."}</div>
-        <button onClick={fetchDeals} style={{ background: "none", border: "none", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>↻ Refresh</button>
-      </div>
-      <div style={{ display: "flex", gap: "6px", marginBottom: "14px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "4px" }}>
-        {categories.map((c) => <button key={c} style={S.pill(filter === c)} onClick={() => setFilter(c)}>{c.charAt(0).toUpperCase() + c.slice(1)}</button>)}
-      </div>
-      {loading && <div style={{ textAlign: "center", color: "#4ade80", padding: "40px 0" }}><div style={{ fontSize: "28px", marginBottom: "8px" }}>📡</div><div style={{ fontSize: "13px" }}>Finding deals near you...</div></div>}
-      {error && <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}><div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div><button onClick={fetchDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button></div>}
-      {!loading && !error && deals.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
-          <div style={{ color: "#fff", fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}>Find deals near you</div>
-          <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "20px" }}>AI scans real reviews to find you savings</div>
-          <button onClick={fetchDeals} style={{ ...S.btn, width: "auto", padding: "12px 24px", marginTop: 0 }}>🎯 Find Nearby Deals</button>
+      {deals.length > 0 && !loading && (
+        <div className="ss-fade" style={{ background: "linear-gradient(135deg, #13532d55, #15803d18)", border: "1px solid #4ade8033", borderRadius: "18px", padding: "14px 16px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ ...S.label, color: "#86efac" }}>STEALS NEAR YOU</div>
+            <div style={{ color: "#fff", fontSize: "26px", fontWeight: 800, lineHeight: 1.1 }}>{deals.length} <span style={{ fontSize: "13px", color: "#ffffff88", fontWeight: 600 }}>places within 1 mi</span></div>
+            <div style={{ ...S.muted, marginTop: "2px" }}>{openNow} open now{origin && ` · 📍 ${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`}</div>
+          </div>
+          <button onClick={onFindDeals} aria-label="Refresh deals" style={{ background: "#0d0d1a", border: "1px solid #4ade8044", borderRadius: "12px", color: "#4ade80", fontSize: "16px", cursor: "pointer", width: "38px", height: "38px" }}>↻</button>
         </div>
       )}
-      {!loading && !error && deals.length > 0 && filtered.length === 0 && <div style={{ textAlign: "center", color: "#ffffff33", padding: "20px 0", fontSize: "13px" }}>No deals in this category.</div>}
-      {!loading && filtered.map((deal, i) => (
-        <div key={deal.id || i} onClick={() => onDealClick && onDealClick(deal)} style={{ ...S.card, border: "1px solid #4ade8022", cursor: "pointer" }}>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#0d0d1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px" }}>{deal.name}</div>
-                {deal.deal_found_in_reviews && <span style={{ background: "#4ade8022", color: "#4ade80", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "6px", letterSpacing: "0.5px" }}>FROM REVIEWS</span>}
-              </div>
-              <div style={{ color: "#4ade8099", fontSize: "12px", marginTop: "2px" }}>{deal.deal}</div>
-              <div style={{ color: "#ffffff33", fontSize: "11px", marginTop: "3px" }}>📍 {deal.distance_label} away{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · 🔴 Closed"}</div>
-            </div>
-            <div style={{ color: "#4ade80", fontWeight: 700, fontSize: "15px", flexShrink: 0 }}>-{deal.saving}</div>
-          </div>
+
+      {deals.length > 0 && !loading && (
+        <div className="ss-scroll" style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "2px" }}>
+          <button style={S.pill(filter === "all")} onClick={() => setFilter("all")}>All {deals.length}</button>
+          {categories.map((c) => {
+            const meta = categoryMeta(c);
+            return <button key={c} style={S.pill(filter === c, meta.color)} onClick={() => setFilter(c)}>{meta.label} {counts[c]}</button>;
+          })}
         </div>
-      ))}
+      )}
+
+      {loading && (
+        <div>
+          <div style={{ textAlign: "center", color: "#4ade80", fontSize: "12px", fontWeight: 700, margin: "4px 0 14px" }}>
+            📡 Searching nearby places and writing tips with Gemini...
+          </div>
+          {[0, 1, 2, 3, 4].map((i) => <div key={i} className="ss-skeleton" style={{ height: "74px", marginBottom: "10px", animationDelay: `${i * 0.1}s` }} />)}
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ background: "#2a1a1a", border: "1px solid #f8717133", borderRadius: "14px", padding: "16px", textAlign: "center" }}>
+          <div style={{ color: "#f87171", fontSize: "13px", marginBottom: "8px" }}>{error}</div>
+          <button onClick={onFindDeals} style={{ ...S.btn, marginTop: "4px" }}>Try Again</button>
+        </div>
+      )}
+
+      {!loading && !error && deals.length === 0 && (
+        <div className="ss-fade" style={{ textAlign: "center", padding: "36px 0" }}>
+          <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔍</div>
+          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, marginBottom: "6px" }}>Find steals near you</div>
+          <div style={{ color: "#ffffff55", fontSize: "12px", marginBottom: "22px", lineHeight: 1.5, padding: "0 10px" }}>
+            We'll look for cafés, restaurants, grocery stores, bookstores, gyms and theaters within a mile, and Gemini will suggest how to save at each one.
+          </div>
+          <button onClick={onFindDeals} style={{ ...S.btn, width: "auto", padding: "12px 24px", marginTop: 0 }}>🎯 Find Nearby Deals</button>
+        </div>
+      )}
+
+      {!loading && filtered.map((deal, i) => {
+        const meta = categoryMeta(deal.category);
+        const upTo = /^up to /i.test(deal.saving);
+        return (
+          <div key={deal.id} className="ss-fade ss-card-hover" onClick={() => onDealClick(deal)} style={{ ...S.card, cursor: "pointer", animationDelay: `${Math.min(i, 10) * 0.03}s` }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: `${meta.color}1a`, border: `1px solid ${meta.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{deal.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#fff", fontWeight: 700, fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{deal.name}</div>
+                <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "3px", lineHeight: 1.4 }}>{deal.deal}</div>
+                <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "4px" }}>
+                  <span style={{ color: meta.color }}>{meta.label}</span> · {deal.distance_label}{deal.rating && ` · ⭐ ${deal.rating}`}{deal.open_now === true && " · 🟢 Open"}{deal.open_now === false && " · Closed"}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ color: "#ffffff44", fontSize: "9px", fontWeight: 700, letterSpacing: "1px" }}>{upTo ? "SAVE UP TO" : "SAVE"}</div>
+                <div style={{ color: "#4ade80", fontWeight: 800, fontSize: "13px", whiteSpace: "nowrap" }}>{upTo ? deal.saving.slice(6) : deal.saving}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {!loading && deals.length > 0 && (
+        <div style={{ ...S.muted, fontSize: "10px", textAlign: "center", marginTop: "6px" }}>Tips are AI suggestions. Ask in store to confirm discounts.</div>
+      )}
     </div>
   );
 }
@@ -1013,6 +1068,32 @@ export default function DormDeal() {
   const [spending, setSpending] = useState({});
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [deals, setDeals] = useState([]);
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealsError, setDealsError] = useState(null);
+  const [origin, setOrigin] = useState(null);
+
+  const findDeals = useCallback(() => {
+    if (!navigator.geolocation) { setDealsError("Your browser doesn't support location."); return; }
+    setDealsLoading(true);
+    setDealsError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setOrigin(here);
+        try {
+          const data = await postJSON("/deals", { ...here, radius: DEAL_RADIUS_M });
+          setDeals(data.deals || []);
+          setSelectedDeal(null);
+        } catch (e) {
+          setDealsError(friendlyError(e));
+        } finally {
+          setDealsLoading(false);
+        }
+      },
+      () => { setDealsError("Location access denied. Allow location in your browser to find deals."); setDealsLoading(false); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }, []);
 
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
@@ -1084,7 +1165,7 @@ export default function DormDeal() {
               </div>
             </div>
             <div style={S.scrollArea}>
-              {tab === "deals" && <DealsTab deals={deals} setDeals={setDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
+              {tab === "deals" && <DealsTab deals={deals} loading={dealsLoading} error={dealsError} origin={origin} onFindDeals={findDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
               {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
               {tab === "budget" && budgets && (
                 <BudgetTab

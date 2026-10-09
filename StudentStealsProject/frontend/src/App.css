@@ -204,3 +204,30 @@ input[type="number"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------
+   Cards and loading placeholders
+--------------------------------------------------------------- */
+.ss-card-hover {
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.ss-card-hover:hover {
+  transform: translateY(-1px);
+  border-color: #4ade8055 !important;
+}
+
+@keyframes ss-shimmer {
+  from {
+    background-position: -300px 0;
+  }
+  to {
+    background-position: 300px 0;
+  }
+}
+
+.ss-skeleton {
+  border-radius: 18px;
+  background: linear-gradient(90deg, #13132a 0, #1c1c3a 50%, #13132a 100%);
+  background-size: 600px 100%;
+  animation: ss-shimmer 1.3s linear infinite;
+}
