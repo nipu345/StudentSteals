@@ -15,6 +15,8 @@ const CATEGORY_META = {
 };
 const categoryMeta = (c) => CATEGORY_META[c] || { label: c.charAt(0).toUpperCase() + c.slice(1), color: "#94a3b8" };
 
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
 // Turns "Failed to fetch" into something a person can act on
 function friendlyError(e) {
   if (e instanceof TypeError) return "Can't reach the StudentSteals server. Is app.py running on port 8080?";
@@ -387,97 +389,180 @@ function AddPurchaseModal({ categories, onAdd, onClose }) {
 // -------------------------------------------------------------------
 // MAP SCREEN
 // -------------------------------------------------------------------
-function MapScreen({ selectedDeal, deals }) {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef({});
-  const [status, setStatus] = useState("loading");
-  const [coords, setCoords] = useState(null);
-
-  useEffect(() => {
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    const loadLeaflet = () => new Promise((resolve) => {
-      if (window.L) return resolve(window.L);
-      const script = document.createElement("script");
+function loadLeaflet() {
+  return new Promise((resolve, reject) => {
+    if (window.L) return resolve(window.L);
+    let script = document.getElementById("leaflet-js");
+    if (!script) {
+      script = document.createElement("script");
+      script.id = "leaflet-js";
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve(window.L);
       document.head.appendChild(script);
-    });
+    }
+    script.addEventListener("load", () => resolve(window.L));
+    script.addEventListener("error", reject);
+  });
+}
 
-    const initMap = async (lat, lng) => {
-      const L = await loadLeaflet();
-      if (!mapRef.current || mapInstanceRef.current) return;
-      const map = L.map(mapRef.current, { center: [lat, lng], zoom: 15, zoomControl: false });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap © CARTO", maxZoom: 19 }).addTo(map);
+function dealPopupHtml(deal) {
+  const meta = categoryMeta(deal.category);
+  return `<div style="min-width:170px">
+    <div style="color:${meta.color};font-size:9px;font-weight:700;letter-spacing:1px">${escapeHtml(meta.label.toUpperCase())} · ${escapeHtml(deal.distance_label)}</div>
+    <div style="color:#fff;font-weight:800;font-size:13px;margin:2px 0 4px">${escapeHtml(deal.name)}</div>
+    <div style="color:#cbd5e1">${escapeHtml(deal.deal)}</div>
+    <div style="color:#4ade80;font-weight:700;margin-top:6px">💰 Save ${escapeHtml(deal.saving)}</div>
+  </div>`;
+}
 
-      // Green dot for user location
-      const greenDot = L.divIcon({ className: "", html: `<div style="width:18px;height:18px;border-radius:50%;background:#4ade80;border:3px solid #fff;box-shadow:0 0 0 4px rgba(74,222,128,0.3),0 0 20px rgba(74,222,128,0.5);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
-      L.marker([lat, lng], { icon: greenDot }).addTo(map).bindPopup("<b>You are here</b>");
-      mapInstanceRef.current = map;
-      setStatus("success");
-      setCoords({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
+function MapScreen({ deals, origin, selectedDeal, onSelectDeal, dealsLoading, onFindDeals }) {
+  const mapEl = useRef(null);
+  const mapRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const dealLayerRef = useRef(null);
+  const markersRef = useRef({});
+  const [status, setStatus] = useState("loading"); // loading | ready | denied | error
+  const [here, setHere] = useState(null);
 
-      // Place markers from already-fetched deals — no extra API call
-      if (deals && deals.length > 0) {
-        deals.forEach((deal) => {
-          const dealIcon = L.divIcon({ className: "", html: `<div style="background:#4ade80;color:#000;padding:4px 6px;border-radius:8px;font-size:12px;font-weight:700;">${deal.emoji}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-          const marker = L.marker([deal.lat, deal.lng], { icon: dealIcon }).addTo(map).bindPopup(`<b>${deal.name}</b><br/>${deal.deal}<br/>💰 Save ${deal.saving}`);
-          markersRef.current[deal.id] = marker;
-        });
-      }
+  // Create the map on the first location fix, then keep the "you" dot live with watchPosition
+  useEffect(() => {
+    let cancelled = false;
+    let watchId = null;
+    if (!navigator.geolocation) { setStatus("denied"); return; }
+
+    loadLeaflet().then((L) => {
+      if (cancelled) return;
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const ll = [pos.coords.latitude, pos.coords.longitude];
+          setHere({ lat: ll[0], lng: ll[1], accuracy: Math.round(pos.coords.accuracy) });
+          if (mapRef.current) { userMarkerRef.current.setLatLng(ll); return; }
+
+          const map = L.map(mapEl.current, { center: ll, zoom: 15, zoomControl: false });
+          // OpenStreetMap tiles, darkened in App.css (CARTO's dark tiles now need an API key)
+          L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 19 }).addTo(map);
+          dealLayerRef.current = L.layerGroup().addTo(map);
+          const userIcon = L.divIcon({ className: "", html: `<div class="ss-user-dot"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+          userMarkerRef.current = L.marker(ll, { icon: userIcon, zIndexOffset: 1000 }).addTo(map).bindPopup("<b>You are here</b>");
+          mapRef.current = map;
+          setStatus("ready");
+        },
+        () => { if (!mapRef.current) setStatus("denied"); },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+      );
+    }).catch(() => !cancelled && setStatus("error"));
+
+    return () => {
+      cancelled = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
-      () => setStatus("denied")
-    );
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
-  // Fly to selected deal — retry until marker is placed on map
+  // Draw the search radius and one pin per deal whenever the deals change
   useEffect(() => {
-    if (!selectedDeal) return;
-    let attempts = 0;
-    const interval = setInterval(() => {
-      const marker = markersRef.current[selectedDeal.id];
-      const map = mapInstanceRef.current;
-      if (marker && map) {
-        map.setView(marker.getLatLng(), 17);
-        marker.openPopup();
-        clearInterval(interval);
-      }
-      if (++attempts > 30) clearInterval(interval); // give up after 3s
-    }, 100);
-    return () => clearInterval(interval);
-  }, [selectedDeal]);
+    const L = window.L;
+    const map = mapRef.current;
+    const layer = dealLayerRef.current;
+    if (status !== "ready" || !L || !map || !layer) return;
+    layer.clearLayers();
+    markersRef.current = {};
+    if (!deals.length) return;
+
+    if (origin) {
+      L.circle([origin.lat, origin.lng], { radius: DEAL_RADIUS_M, color: "#4ade80", weight: 1.5, opacity: 0.6, fillOpacity: 0.05, dashArray: "6 6", interactive: false }).addTo(layer);
+    }
+    deals.forEach((deal) => {
+      const { color } = categoryMeta(deal.category);
+      const icon = L.divIcon({ className: "", html: `<div class="ss-pin" style="--pin:${color}"><span>${deal.emoji}</span></div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+      const marker = L.marker([deal.lat, deal.lng], { icon }).addTo(layer).bindPopup(dealPopupHtml(deal), { offset: [0, -10], maxWidth: 220, autoPanPadding: [16, 16] });
+      marker.on("click", () => onSelectDeal(deal));
+      markersRef.current[deal.id] = marker;
+    });
+    if (!selectedDeal) map.fitBounds(L.featureGroup(Object.values(markersRef.current)).getBounds(), { padding: [30, 30], maxZoom: 16 });
+  }, [deals, origin, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fly to whichever deal was picked from the list, a pin, or the carousel
+  useEffect(() => {
+    const marker = selectedDeal && markersRef.current[selectedDeal.id];
+    if (status !== "ready" || !marker) return;
+    mapRef.current.once("moveend", () => marker.openPopup());
+    mapRef.current.flyTo(marker.getLatLng(), 17, { duration: 0.6 });
+    document.getElementById(`carousel-${selectedDeal.id}`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selectedDeal, deals, status]);
+
+  const recenter = () => here && mapRef.current?.flyTo([here.lat, here.lng], 16, { duration: 0.6 });
+  const ctrlBtn = { width: "36px", height: "36px", borderRadius: "10px", background: "#13132aee", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "inherit" };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
-      <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
-        <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Nearby Map</div>
-        {coords && <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "2px", fontFamily: "monospace" }}>📍 {coords.lat}, {coords.lng}</div>}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", minHeight: 0 }}>
+      <div style={{ padding: "14px 20px 12px", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={S.label}>LIVE</div>
+          <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800, whiteSpace: "nowrap" }}>Deals Map</div>
+        </div>
+        <div style={{ textAlign: "right", minWidth: 0 }}>
+          {deals.length > 0 && <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700 }}>{deals.length} deals nearby</div>}
+          {here && <div style={{ ...S.muted, fontFamily: "monospace", fontSize: "10px" }}>📍 {here.lat.toFixed(3)}, {here.lng.toFixed(3)} ±{here.accuracy}m</div>}
+        </div>
       </div>
       <div style={{ flex: 1, position: "relative", margin: "0 12px 12px", borderRadius: "20px", overflow: "hidden", border: "1px solid #1e1e3a" }}>
-        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
-        {status === "loading" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📡</div><div style={{ color: "#4ade80", fontSize: "13px", fontWeight: 700 }}>Finding your location...</div></div>}
-        {status === "denied" && <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "24px", zIndex: 10 }}><div style={{ fontSize: "32px" }}>📍</div><div style={{ color: "#f87171", fontSize: "13px", fontWeight: 700, textAlign: "center" }}>Location access denied</div></div>}
-        {status === "success" && mapInstanceRef.current && (
-          <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: "4px", zIndex: 1000 }}>
-            {["+", "−"].map((label, i) => <button key={i} onClick={() => i === 0 ? mapInstanceRef.current.zoomIn() : mapInstanceRef.current.zoomOut()} style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#4ade80", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{label}</button>)}
-          </div>
+        <div ref={mapEl} className="ss-map" style={{ width: "100%", height: "100%" }} />
+
+        {status === "loading" && <MapNotice icon="📡" text="Finding your location..." />}
+        {status === "denied" && <MapNotice icon="📍" text="Location access is off" sub="Allow location in your browser to see deals around you." error />}
+        {status === "error" && <MapNotice icon="🗺️" text="Couldn't load the map" sub="Check your internet connection." error />}
+
+        {status === "ready" && (
+          <>
+            <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: "6px", zIndex: 1000 }}>
+              <button aria-label="Zoom in" onClick={() => mapRef.current.zoomIn()} style={ctrlBtn}>+</button>
+              <button aria-label="Zoom out" onClick={() => mapRef.current.zoomOut()} style={ctrlBtn}>−</button>
+              <button aria-label="Recenter on me" onClick={recenter} style={{ ...ctrlBtn, fontSize: "16px" }}>◎</button>
+            </div>
+
+            {deals.length === 0 && (
+              <div style={{ position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 1000 }}>
+                <button onClick={onFindDeals} disabled={dealsLoading} style={{ ...S.btn, marginTop: 0, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", opacity: dealsLoading ? 0.7 : 1 }}>
+                  {dealsLoading ? "Finding deals near you..." : "🎯 Find deals around me"}
+                </button>
+              </div>
+            )}
+
+            {deals.length > 0 && (
+              <div className="ss-scroll" style={{ position: "absolute", left: 0, right: 0, bottom: 10, zIndex: 1000, display: "flex", gap: "8px", overflowX: "auto", padding: "0 12px", scrollSnapType: "x mandatory" }}>
+                {deals.map((deal) => {
+                  const active = selectedDeal?.id === deal.id;
+                  const { color } = categoryMeta(deal.category);
+                  return (
+                    <div key={deal.id} id={`carousel-${deal.id}`} onClick={() => onSelectDeal(deal)} style={{ flex: "0 0 210px", scrollSnapAlign: "center", background: "#13132af2", border: `1px solid ${active ? color : "#1e1e3a"}`, borderRadius: "14px", padding: "10px 12px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "18px" }}>{deal.emoji}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: "#fff", fontSize: "12px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{deal.name}</div>
+                          <div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700 }}>Save {deal.saving} <span style={{ color: "#ffffff44", fontWeight: 400 }}>· {deal.distance_label}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
-        {status === "success" && <button onClick={() => { navigator.geolocation.getCurrentPosition((pos) => { mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 15); }); }} style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, background: "#13132a", border: "1px solid #4ade8044", borderRadius: "10px", color: "#4ade80", fontSize: "11px", fontWeight: 700, padding: "8px 12px", cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>◎ Recenter</button>}
       </div>
     </div>
   );
 }
 
+function MapNotice({ icon, text, sub, error }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#0d0d1a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", padding: "24px", zIndex: 1001, textAlign: "center" }}>
+      <div style={{ fontSize: "32px" }}>{icon}</div>
+      <div style={{ color: error ? "#f87171" : "#4ade80", fontSize: "13px", fontWeight: 700 }}>{text}</div>
+      {sub && <div style={S.muted}>{sub}</div>}
+    </div>
+  );
+}
 
 // -------------------------------------------------------------------
 // PROFILE SCREEN
@@ -1136,7 +1221,9 @@ export default function DormDeal() {
 
       <div className="ss-phone">
 
-        {screen === "map" && <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}><MapScreen selectedDeal={selectedDeal} deals={deals} /></div>}
+        {screen === "map" && (
+          <MapScreen deals={deals} origin={origin} selectedDeal={selectedDeal} onSelectDeal={setSelectedDeal} dealsLoading={dealsLoading} onFindDeals={findDeals} />
+        )}
 
         {screen === "profile" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
