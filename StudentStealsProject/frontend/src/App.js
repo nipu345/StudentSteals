@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
@@ -257,6 +257,20 @@ const S = {
     boxSizing: "border-box",
   },
   avatar: (size) => ({ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size / 2, flexShrink: 0 }),
+  ghostBtn: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "14px",
+    background: "#13132a",
+    border: "1px solid #1e1e3a",
+    color: "#ffffffaa",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  sheetBackdrop: { position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "inherit" },
+  sheet: { width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", border: "1px solid #1e1e3a" },
   overlay: {
     position: "absolute",
     inset: 0,
@@ -307,20 +321,25 @@ function NamePrompt({ onDone }) {
 // -------------------------------------------------------------------
 // BUDGET SETUP
 // -------------------------------------------------------------------
-function BudgetSetup({ onDone }) {
-  const [rows, setRows] = useState([
-    { category: "Food", budget: "" },
-    { category: "Subscriptions", budget: "" },
-    { category: "Transport", budget: "" },
-  ]);
+const DEFAULT_BUDGET_ROWS = [
+  { category: "Food", budget: "300" },
+  { category: "Subscriptions", budget: "40" },
+  { category: "Transport", budget: "60" },
+  { category: "Shopping", budget: "75" },
+];
+
+function BudgetSetup({ initial, onDone, onCancel }) {
+  const [rows, setRows] = useState(
+    initial ? Object.entries(initial).map(([category, budget]) => ({ category, budget: String(budget) })) : DEFAULT_BUDGET_ROWS
+  );
 
   const addRow = () => setRows([...rows, { category: "", budget: "" }]);
-  const updateRow = (i, field, value) => { const u = [...rows]; u[i][field] = value; setRows(u); };
+  const updateRow = (i, field, value) => setRows(rows.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
   const removeRow = (i) => setRows(rows.filter((_, idx) => idx !== i));
-  const canConfirm = rows.some((r) => r.category.trim() && parseFloat(r.budget) > 0);
+  const valid = rows.filter((r) => r.category.trim() && parseFloat(r.budget) > 0);
+  const total = valid.reduce((sum, r) => sum + parseFloat(r.budget), 0);
 
   const confirm = () => {
-    const valid = rows.filter((r) => r.category.trim() && parseFloat(r.budget) > 0);
     const budgetMap = {};
     valid.forEach((r) => { budgetMap[r.category.trim()] = parseFloat(r.budget); });
     onDone(budgetMap);
@@ -328,60 +347,68 @@ function BudgetSetup({ onDone }) {
 
   return (
     <div style={S.overlay}>
-      <div style={{ width: "100%", maxHeight: "700px", overflowY: "auto", scrollbarWidth: "none" }}>
+      <div className="ss-scroll ss-fade" style={{ width: "100%", maxHeight: "100%", overflowY: "auto" }}>
         <div style={{ fontSize: "28px", marginBottom: "8px", textAlign: "center" }}>📊</div>
-        <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800, textAlign: "center", marginBottom: "4px" }}>Set Your Monthly Budget</div>
-        <div style={{ color: "#ffffff55", fontSize: "11px", textAlign: "center", marginBottom: "20px" }}>Add categories and how much you want to spend on each</div>
+        <div style={{ color: "#fff", fontSize: "18px", fontWeight: 800, textAlign: "center", marginBottom: "4px" }}>Set your monthly budget</div>
+        <div style={{ color: "#ffffff55", fontSize: "12px", textAlign: "center", marginBottom: "20px" }}>Pick categories and a monthly limit for each</div>
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px", paddingRight: "28px" }}>
-          <div style={{ flex: 2, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>CATEGORY</div>
-          <div style={{ flex: 1, color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>BUDGET ($)</div>
+          <div style={{ ...S.label, flex: 2 }}>CATEGORY</div>
+          <div style={{ ...S.label, flex: 1 }}>BUDGET ($)</div>
         </div>
         {rows.map((row, i) => (
           <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "center" }}>
             <input value={row.category} onChange={(e) => updateRow(i, "category", e.target.value)} placeholder="e.g. Food" style={{ ...S.input, flex: 2 }} />
             <input type="number" value={row.budget} onChange={(e) => updateRow(i, "budget", e.target.value)} placeholder="0" min="0" style={{ ...S.input, flex: 1 }} />
-            <button onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: "#f87171", fontSize: "16px", cursor: "pointer", flexShrink: 0, padding: "0 2px" }}>×</button>
+            <button onClick={() => removeRow(i)} aria-label="Remove category" style={{ background: "none", border: "none", color: "#f87171", fontSize: "18px", cursor: "pointer", flexShrink: 0, padding: "0 4px" }}>×</button>
           </div>
         ))}
-        <button onClick={addRow} style={{ background: "none", border: "1px dashed #1e1e3a", borderRadius: "12px", color: "#4ade8088", fontSize: "12px", fontWeight: 700, cursor: "pointer", width: "100%", padding: "10px", fontFamily: "'Syne', sans-serif", marginBottom: "16px" }}>
+        <button onClick={addRow} style={{ background: "none", border: "1px dashed #2a2a4a", borderRadius: "12px", color: "#4ade80aa", fontSize: "12px", fontWeight: 700, cursor: "pointer", width: "100%", padding: "10px", fontFamily: "inherit", marginBottom: "16px" }}>
           + Add Category
         </button>
-        <button onClick={confirm} disabled={!canConfirm} style={{ ...S.btn, opacity: canConfirm ? 1 : 0.4, marginTop: 0 }}>
-          ✓ Confirm Budget
+        <div style={{ display: "flex", justifyContent: "space-between", color: "#ffffff88", fontSize: "12px", marginBottom: "4px" }}>
+          <span>Monthly total</span><span style={{ color: "#fff", fontWeight: 700 }}>{money(total)}</span>
+        </div>
+        <button onClick={confirm} disabled={!valid.length} style={{ ...S.btn, opacity: valid.length ? 1 : 0.4 }}>
+          ✓ Save Budget
         </button>
+        {onCancel && <button onClick={onCancel} style={{ ...S.ghostBtn, marginTop: "8px", border: "none", background: "none", color: "#ffffff66" }}>Cancel</button>}
       </div>
     </div>
   );
 }
 
 // -------------------------------------------------------------------
-// ADD PURCHASE MODAL
+// ADD PURCHASE SHEET
 // -------------------------------------------------------------------
 function AddPurchaseModal({ categories, onAdd, onClose }) {
   const [category, setCategory] = useState(categories[0] || "");
+  const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const val = parseFloat(amount);
+  const canSubmit = category && !isNaN(val) && val > 0;
 
   const submit = () => {
-    const val = parseFloat(amount);
-    if (!category || isNaN(val) || val <= 0) return;
-    onAdd(category, val);
+    if (!canSubmit) return;
+    onAdd({ name: name.trim() || category, amount: val, category });
     onClose();
   };
 
   return (
-    <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.88)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "inherit" }}>
-      <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 32px", border: "1px solid #1e1e3a" }}>
+    <div style={S.sheetBackdrop} onClick={onClose}>
+      <div className="ss-sheet" style={S.sheet} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Add Purchase</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff55", fontSize: "20px", cursor: "pointer" }}>×</button>
+          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Add a purchase</div>
+          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "#ffffff55", fontSize: "22px", cursor: "pointer" }}>×</button>
         </div>
-        <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>CATEGORY</div>
-        <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...S.input, marginBottom: "14px", appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234ade80'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: "32px", cursor: "pointer" }}>
-          {categories.map((c) => <option key={c} value={c} style={{ background: "#13132a" }}>{c}</option>)}
-        </select>
-        <div style={{ color: "#ffffff88", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" }}>AMOUNT ($)</div>
-        <input autoFocus type="number" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="0.00" min="0" step="0.01" style={{ ...S.input, marginBottom: "18px", fontSize: "20px", fontWeight: 700 }} />
-        <button onClick={submit} disabled={!amount || parseFloat(amount) <= 0} style={{ ...S.btn, marginTop: 0, opacity: amount && parseFloat(amount) > 0 ? 1 : 0.4 }}>
+        <div style={{ ...S.label, color: "#ffffff88", marginBottom: "6px" }}>AMOUNT ($)</div>
+        <input autoFocus type="number" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="0.00" min="0" step="0.01" style={{ ...S.input, marginBottom: "14px", fontSize: "22px", fontWeight: 700 }} />
+        <div style={{ ...S.label, color: "#ffffff88", marginBottom: "6px" }}>WHAT WAS IT? (OPTIONAL)</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="e.g. Chipotle burrito bowl" style={{ ...S.input, marginBottom: "14px" }} />
+        <div style={{ ...S.label, color: "#ffffff88", marginBottom: "8px" }}>CATEGORY</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "18px" }}>
+          {categories.map((c) => <button key={c} onClick={() => setCategory(c)} style={S.pill(category === c)}>{c}</button>)}
+        </div>
+        <button onClick={submit} disabled={!canSubmit} style={{ ...S.btn, marginTop: 0, opacity: canSubmit ? 1 : 0.4 }}>
           Add Purchase
         </button>
       </div>
@@ -640,76 +667,6 @@ function ProfileScreen({ userName }) {
 }
 
 // -------------------------------------------------------------------
-// BANK LOGIN FORM
-// -------------------------------------------------------------------
-function BankLoginForm({ bankName, onSubmit, onClose }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [accountNum, setAccountNum] = useState("");
-  const [routingNum, setRoutingNum] = useState("");
-  const [accountType, setAccountType] = useState("checking");
-  const [showPass, setShowPass] = useState(false);
-  const canSubmit = username.trim() && password.trim() && accountNum.length === 4 && routingNum.length === 9;
-
-  const fieldStyle = { background: "#0d0d1a", border: "1px solid #1e1e3a", borderRadius: "12px", padding: "11px 14px", color: "#fff", fontSize: "13px", fontFamily: "'Syne', sans-serif", outline: "none", width: "100%", boxSizing: "border-box" };
-  const labelStyle = { color: "#ffffff66", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "6px" };
-
-  return (
-    <div style={{ maxHeight: "520px", overflowY: "auto", scrollbarWidth: "none" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-        <div>
-          <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Sign in to {bankName}</div>
-          <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "2px" }}>Enter your online banking credentials</div>
-        </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff44", fontSize: "22px", cursor: "pointer" }}>×</button>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "20px", marginTop: "6px" }}>
-        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4ade80" }} />
-        <div style={{ color: "#4ade8088", fontSize: "10px", fontWeight: 700, letterSpacing: "1px" }}>SECURED BY PLAID · READ-ONLY ACCESS</div>
-      </div>
-
-      <div style={labelStyle}>ONLINE BANKING USERNAME</div>
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter username" autoComplete="off" style={{ ...fieldStyle, marginBottom: "12px" }} />
-
-      <div style={labelStyle}>PASSWORD</div>
-      <div style={{ position: "relative", marginBottom: "12px" }}>
-        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" type={showPass ? "text" : "password"} style={{ ...fieldStyle, paddingRight: "40px" }} />
-        <button onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#ffffff44", cursor: "pointer", fontSize: "14px" }}>
-          {showPass ? "🙈" : "👁️"}
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-        <div style={{ flex: 1 }}>
-          <div style={labelStyle}>ACCOUNT NUMBER (last 4)</div>
-          <input value={accountNum} onChange={(e) => setAccountNum(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))} placeholder="••••" maxLength={4} style={{ ...fieldStyle, letterSpacing: "6px", fontSize: "16px" }} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={labelStyle}>ROUTING NUMBER</div>
-          <input value={routingNum} onChange={(e) => setRoutingNum(e.target.value.replace(/[^0-9]/g, "").slice(0, 9))} placeholder="9 digits" maxLength={9} style={{ ...fieldStyle, fontSize: "13px" }} />
-        </div>
-      </div>
-
-      <div style={labelStyle}>ACCOUNT TYPE</div>
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-        {["checking", "savings"].map((type) => (
-          <button key={type} onClick={() => setAccountType(type)} style={{ flex: 1, padding: "10px", borderRadius: "12px", border: `1px solid ${accountType === type ? "#4ade80" : "#1e1e3a"}`, background: accountType === type ? "#4ade8018" : "#0d0d1a", color: accountType === type ? "#4ade80" : "#ffffff44", fontWeight: 700, fontSize: "12px", cursor: "pointer", fontFamily: "'Syne', sans-serif", textTransform: "capitalize" }}>
-            {type === "checking" ? "🏧 Checking" : "🏦 Savings"}
-          </button>
-        ))}
-      </div>
-
-      <button onClick={onSubmit} disabled={!canSubmit} style={{ background: canSubmit ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#1e1e3a", border: "none", borderRadius: "14px", padding: "13px 20px", color: canSubmit ? "#080810" : "#ffffff33", fontWeight: 700, fontSize: "13px", cursor: canSubmit ? "pointer" : "default", fontFamily: "'Syne', sans-serif", width: "100%" }}>
-        Connect Account →
-      </button>
-      <div style={{ textAlign: "center", color: "#ffffff22", fontSize: "10px", marginTop: "10px" }}>
-        🔒 Your credentials are encrypted and never stored
-      </div>
-    </div>
-  );
-}
-
-// -------------------------------------------------------------------
 // DEALS TAB
 // -------------------------------------------------------------------
 function DealsTab({ deals, loading, error, origin, onFindDeals, onDealClick }) {
@@ -890,118 +847,78 @@ function CoachTab({ messages, setMessages, budgets, spending, transactions, deal
 // -------------------------------------------------------------------
 // BUDGET TAB
 // -------------------------------------------------------------------
-function BudgetTab({ budgets, spending, onAddPurchase, onBankSync, syncedTransactions, setSyncedTransactions }) {
-  const [insights, setInsights] = useState(null);
+function BudgetTab({ budgets, spending, transactions, onAddPurchase, onRemovePurchase, onLoadDemo, insights, setInsights }) {
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [showAddPurchase, setShowAddPurchase] = useState(false);
-  const [bankConnected, setBankConnected] = useState(false);
-  const [showBankModal, setShowBankModal] = useState(false);
-  const [selectedBank, setSelectedBank] = useState(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginStep, setLoginStep] = useState("form"); // "form" | "loading" | "syncing"
-  const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "done"
+  const [loadingDemo, setLoadingDemo] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  // ── BANK SYNC WITH AI CATEGORIZATION ──────────────────────────────
-  const connectBank = async (bankName) => {
-    setShowBankModal(false);
-    setSelectedBank(bankName);
-    setShowLoginModal(true);
-    setLoginStep("form");
-  };
+  const demoLoaded = transactions.some((t) => t.source === "demo");
 
-  const submitBankLogin = async () => {
-    setLoginStep("loading");
-    await new Promise((r) => setTimeout(r, 2200));
-    setLoginStep("syncing");
-    await new Promise((r) => setTimeout(r, 1800));
-    setShowLoginModal(false);
-    setSyncStatus("syncing");
-    setSyncedTransactions([]);
-    const bankName = selectedBank;
-
+  // Demo only: loads sample transactions from public/purchases.txt. There is no real bank connection.
+  const loadDemo = async () => {
+    setLoadingDemo(true);
     try {
-      // 1. Load purchases from the txt file
       const allPurchases = await loadPurchases();
-
-      // 2. Pick a random slice of 12–18 purchases to simulate a month
-      const shuffled = allPurchases.sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, 18);
-
-      // 3. Categorize locally using keyword matching
-      const userCategories = Object.keys(budgets);
-      const categorized = categorizeAllAtOnce(selected, userCategories);
-
-      // Show them appearing one by one visually
-      for (const item of categorized) {
-        setSyncedTransactions((prev) => [...prev, item]);
-        await new Promise((r) => setTimeout(r, 100));
-      }
-
-      // 5. Tally up totals per category (including "Other")
-      const totals = {};
-      categorized.forEach(({ category, amount }) => {
-        totals[category] = (totals[category] || 0) + amount;
-      });
-
-      // 5. Send to parent to update spending state
-      onBankSync(totals, bankName);
-      setBankConnected(bankName);
-      setSyncStatus("done");
-
+      const selected = [...allPurchases].sort(() => Math.random() - 0.5).slice(0, 18);
+      const today = new Date().getDate();
+      const categorized = categorizeAllAtOnce(selected, Object.keys(budgets)).map((t) => ({
+        ...t,
+        date: new Date(new Date().setDate(1 + Math.floor(Math.random() * today))).toISOString(),
+        source: "demo",
+      }));
+      onLoadDemo(categorized);
     } catch (e) {
-      console.error("Bank sync failed:", e);
-      setSyncStatus(null);
+      console.error("Demo load failed:", e);
+    } finally {
+      setLoadingDemo(false);
     }
   };
 
   const fetchInsights = async () => {
     setLoadingInsights(true);
-    setInsights(null);
     try {
-      const res = await fetch(`${BACKEND_URL}/insights`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          budgets,
-          spending,
-          transactions: syncedTransactions,
-        }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const data = await postJSON("/insights", { budgets, spending, transactions });
       setInsights(data.insights);
     } catch (e) {
-      setInsights("Something went wrong. Make sure your backend is running.");
+      setInsights(`⚠️ ${friendlyError(e)}`);
     } finally {
       setLoadingInsights(false);
     }
   };
 
-  const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
-  const otherSpent = spending["Other"] || 0;
-  const totalSpent = Object.values(spending).reduce((a, b) => a + b, 0);
-  const moneyLeft = totalBudget - (totalSpent - otherSpent); // "Other" doesn't count against budget
-  const isOverall = moneyLeft < 0;
   const categories = Object.keys(budgets);
+  const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
+  const trackedSpent = categories.reduce((sum, c) => sum + (spending[c] || 0), 0);
+  const otherSpent = spending["Other"] || 0;
+  const moneyLeft = totalBudget - trackedSpent; // "Other" doesn't count against budget
+  const isOver = moneyLeft < 0;
+  const overallPct = totalBudget ? Math.min((trackedSpent / totalBudget) * 100, 100) : 0;
   const now = new Date();
+  const recent = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const visible = showAll ? recent : recent.slice(0, 5);
 
   return (
-    <div style={{ padding: "0 20px 20px", position: "relative" }}>
-
+    <div style={{ padding: "0 20px 20px" }}>
       {/* Summary card */}
-      <div style={{ background: isOverall ? "linear-gradient(135deg, #53131333, #7f1d1d18)" : "linear-gradient(135deg, #13532d33, #15803d18)", border: `1px solid ${isOverall ? "#f8717133" : "#4ade8033"}`, borderRadius: "18px", padding: "16px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ color: isOverall ? "#fca5a5" : "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>{isOverall ? "OVER BUDGET" : "MONEY LEFT"}</div>
-          <div style={{ color: isOverall ? "#f87171" : "#4ade80", fontSize: "30px", fontWeight: 700 }}>{isOverall ? `-$${Math.abs(moneyLeft).toFixed(2)}` : `$${moneyLeft.toFixed(2)}`}</div>
-          <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>${totalSpent.toFixed(2)} spent of ${totalBudget.toFixed(2)}</div>
+      <div style={{ background: isOver ? "linear-gradient(135deg, #53131355, #7f1d1d18)" : "linear-gradient(135deg, #13532d55, #15803d18)", border: `1px solid ${isOver ? "#f8717133" : "#4ade8033"}`, borderRadius: "18px", padding: "16px", marginBottom: "18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ ...S.label, color: isOver ? "#fca5a5" : "#86efac" }}>{isOver ? "OVER BUDGET" : "MONEY LEFT"}</div>
+            <div style={{ color: isOver ? "#f87171" : "#4ade80", fontSize: "32px", fontWeight: 800, lineHeight: 1.15 }}>{isOver ? `-${money(Math.abs(moneyLeft))}` : money(moneyLeft)}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ ...S.label, color: "#86efac" }}>{now.toLocaleString("default", { month: "long" }).toUpperCase()}</div>
+            <div style={{ color: "#ffffff88", fontSize: "11px", marginTop: "4px" }}>{transactions.length} purchases</div>
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#86efac", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px" }}>THIS MONTH</div>
-          <div style={{ color: "#fff", fontSize: "13px", marginTop: "4px" }}>{now.toLocaleString("default", { month: "long" })} {now.getFullYear()}</div>
+        <div style={{ background: "#0d0d1a88", borderRadius: "100px", height: "6px", margin: "12px 0 6px" }}>
+          <div style={{ width: `${overallPct}%`, height: "100%", borderRadius: "100px", background: isOver ? "#f87171" : "#4ade80", transition: "width 0.6s ease" }} />
         </div>
+        <div style={{ color: "#ffffff66", fontSize: "11px" }}>{money(trackedSpent)} spent of {money(totalBudget)}</div>
       </div>
 
-      {/* User budget category bars */}
+      {/* Category bars */}
       {categories.map((key) => {
         const amount = spending[key] || 0;
         const budget = budgets[key];
@@ -1011,145 +928,76 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync, syncedTransac
           <div key={key} style={{ marginBottom: "14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
               <span style={{ color: "#fff", fontWeight: 600, fontSize: "13px" }}>{key}</span>
-              <span style={{ fontSize: "12px", color: over ? "#f87171" : "#ffffff66" }}>${amount.toFixed(2)} <span style={{ color: "#ffffff33" }}>/ ${budget.toFixed(2)}</span></span>
+              <span style={{ fontSize: "12px", color: over ? "#f87171" : "#ffffffaa" }}>{money(amount)} <span style={{ color: "#ffffff44" }}>/ {money(budget)}</span></span>
             </div>
-            <div style={{ background: "#13132a", borderRadius: "100px", height: "7px" }}>
+            <div style={{ background: "#13132a", borderRadius: "100px", height: "8px" }}>
               <div style={{ width: `${pct}%`, height: "100%", borderRadius: "100px", background: over ? "#f87171" : pct > 80 ? "#facc15" : "#4ade80", transition: "width 0.6s ease" }} />
             </div>
-            {over && <div style={{ color: "#f87171", fontSize: "10px", marginTop: "3px" }}>⚠️ ${(amount - budget).toFixed(2)} over budget</div>}
+            {over && <div style={{ color: "#f87171", fontSize: "10px", marginTop: "3px" }}>⚠️ {money(amount - budget)} over budget</div>}
           </div>
         );
       })}
 
-      {/* "Other" category — only shown if AI put anything there */}
-
-
-      {/* "Other" category — only shown if anything landed there */}
-      {(spending["Other"] || 0) > 0 && (
-        <div style={{ marginBottom: "14px", paddingTop: "10px", borderTop: "1px dashed #1e1e3a" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-            <span style={{ color: "#ffffff66", fontWeight: 600, fontSize: "13px" }}>Other <span style={{ fontSize: "10px", color: "#ffffff33", fontWeight: 400 }}>(uncategorized)</span></span>
-            <span style={{ fontSize: "12px", color: "#ffffff44" }}>${(spending["Other"] || 0).toFixed(2)}</span>
-          </div>
-          <div style={{ background: "#13132a", borderRadius: "100px", height: "7px" }}>
-            <div style={{ width: "100%", height: "100%", borderRadius: "100px", background: "#ffffff22" }} />
-          </div>
-          {syncedTransactions.filter((t) => t.category === "Other").map((t, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
-              <span style={{ color: "#ffffff33", fontSize: "11px" }}>· {t.name}</span>
-              <span style={{ color: "#ffffff33", fontSize: "11px" }}>${t.amount.toFixed(2)}</span>
-            </div>
-          ))}
+      {otherSpent > 0 && (
+        <div style={{ marginBottom: "14px", paddingTop: "10px", borderTop: "1px dashed #1e1e3a", display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "#ffffff77", fontWeight: 600, fontSize: "13px" }}>Other <span style={{ fontSize: "10px", color: "#ffffff44", fontWeight: 400 }}>(no matching budget)</span></span>
+          <span style={{ fontSize: "12px", color: "#ffffff77" }}>{money(otherSpent)}</span>
         </div>
       )}
 
-      {/* Syncing UI — live transaction feed */}
-      {syncStatus === "syncing" && (
-        <div style={{ background: "#13132a", border: "1px solid #4ade8033", borderRadius: "16px", padding: "14px", marginBottom: "12px" }}>
-          <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700, marginBottom: "10px" }}>
-            📡 Syncing transactions...
-          </div>
-          {syncedTransactions.map((t, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #1e1e3a11", animation: "fadeIn 0.3s ease" }}>
-              <div>
-                <span style={{ color: "#fff", fontSize: "12px" }}>{t.name}</span>
-                <span style={{ color: "#4ade8077", fontSize: "10px", marginLeft: "8px" }}>→ {t.category}</span>
-              </div>
-              <span style={{ color: "#ffffff55", fontSize: "12px" }}>-${t.amount.toFixed(2)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Actions */}
+      <div style={{ display: "flex", gap: "8px", margin: "6px 0 10px" }}>
+        <button onClick={() => setShowAddPurchase(true)} style={{ ...S.ghostBtn, flex: 1 }}>+ Add Purchase</button>
+        {!demoLoaded && (
+          <button onClick={loadDemo} disabled={loadingDemo} style={{ ...S.ghostBtn, flex: 1, color: "#4ade80", border: "1px solid #4ade8044" }}>
+            {loadingDemo ? "Loading..." : "🧪 Load Demo Month"}
+          </button>
+        )}
+      </div>
+      {!demoLoaded && <div style={{ ...S.muted, fontSize: "10px", textAlign: "center", marginBottom: "10px" }}>The demo loads sample student purchases and auto-sorts them into your categories.</div>}
 
-      {/* Bank connect / connected badge */}
-      {!bankConnected ? (
-        <button onClick={() => setShowBankModal(true)} style={{ width: "100%", padding: "13px", borderRadius: "14px", marginBottom: "10px", background: "linear-gradient(135deg, #13132a, #1a1a2e)", border: "1px solid #4ade8055", color: "#4ade80", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          🏦 Connect Bank Account
-        </button>
-      ) : (
-        <div style={{ background: "#13132a", border: "1px solid #4ade8033", borderRadius: "14px", padding: "12px 14px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ color: "#4ade80", fontSize: "12px", fontWeight: 700 }}>🏦 {bankConnected}</div>
-            <div style={{ color: "#ffffff44", fontSize: "10px", marginTop: "2px" }}>
-              {syncedTransactions.length} transactions synced · AI categorized
-            </div>
-          </div>
-          <div style={{ color: "#4ade80", fontSize: "18px" }}>✓</div>
-        </div>
-      )}
-
-      {/* Add Purchase manually */}
-      <button onClick={() => setShowAddPurchase(true)} style={{ width: "100%", padding: "12px", borderRadius: "14px", marginBottom: "10px", background: "#13132a", border: "1px solid #1e1e3a", color: "#ffffff66", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>
-        + Add Purchase Manually
-      </button>
-
-      {/* AI Spending Insights */}
-      <button onClick={fetchInsights} style={S.btn} disabled={loadingInsights}>
-        {loadingInsights ? "Analyzing your spending..." : "✨ Get AI Spending Insights"}
+      <button onClick={fetchInsights} style={{ ...S.btn, opacity: loadingInsights || !transactions.length ? 0.5 : 1 }} disabled={loadingInsights || !transactions.length}>
+        {loadingInsights ? "Analyzing your spending..." : insights ? "✨ Refresh AI Spending Report" : "✨ Get AI Spending Report"}
       </button>
 
       {insights && (
-        <div style={{ ...S.card, marginTop: "10px", border: "1px solid #4ade8033" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>🤖</div>
+        <div className="ss-fade" style={{ ...S.card, marginTop: "10px", border: "1px solid #4ade8033" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+            <div style={S.avatar(32)}>🤖</div>
             <div>
-              <div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700, letterSpacing: "1px" }}>AI SPENDING INSIGHTS</div>
-              <div style={{ color: "#ffffff44", fontSize: "10px" }}>Based on your recent transactions</div>
+              <div style={{ ...S.label, letterSpacing: "1px" }}>AI SPENDING REPORT</div>
+              <div style={{ ...S.muted, fontSize: "10px" }}>Gemini's read on your budget and purchases</div>
             </div>
           </div>
-          <div style={{ color: "#e2e8f0", fontSize: "13px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+          <div className="ss-md" style={{ color: "#e2e8f0", fontSize: "13px", lineHeight: 1.65 }}>
             <ReactMarkdown>{insights}</ReactMarkdown>
           </div>
         </div>
       )}
 
-      {/* Modals */}
-      {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
-
-      {showLoginModal && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.95)", display: "flex", alignItems: "flex-end", zIndex: 300, borderRadius: "inherit" }}>
-          <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "28px 20px 36px", border: "1px solid #1e1e3a" }}>
-            {loginStep === "form" && <BankLoginForm bankName={selectedBank} onSubmit={submitBankLogin} onClose={() => setShowLoginModal(false)} />}
-            {loginStep === "loading" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
-                <div style={{ fontSize: "36px", marginBottom: "16px" }}>🔐</div>
-                <div style={{ color: "#fff", fontSize: "15px", fontWeight: 800, marginBottom: "8px" }}>Verifying credentials...</div>
-                <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "24px" }}>Connecting to {selectedBank}</div>
-                <div style={{ width: "100%", height: "4px", background: "#1e1e3a", borderRadius: "100px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", background: "linear-gradient(90deg, #4ade80, #22c55e)", borderRadius: "100px", animation: "loadbar 2.2s ease forwards", width: "0%" }} />
-                </div>
-                <style>{`@keyframes loadbar { from { width: 0% } to { width: 100% } }`}</style>
-              </div>
-            )}
-            {loginStep === "syncing" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
-                <div style={{ fontSize: "36px", marginBottom: "16px" }}>🏦</div>
-                <div style={{ color: "#4ade80", fontSize: "15px", fontWeight: 800, marginBottom: "8px" }}>Connected!</div>
-                <div style={{ color: "#ffffff44", fontSize: "12px", marginBottom: "6px" }}>Fetching your transactions...</div>
-                <div style={{ color: "#ffffff22", fontSize: "11px" }}>256-bit encrypted · read-only access</div>
-              </div>
-            )}
+      {/* Transactions */}
+      {transactions.length > 0 && (
+        <div style={{ marginTop: "18px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <div style={S.label}>RECENT PURCHASES</div>
+            {transactions.length > 5 && <button onClick={() => setShowAll(!showAll)} style={{ background: "none", border: "none", color: "#4ade80", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>{showAll ? "Show less" : `Show all ${transactions.length}`}</button>}
           </div>
-        </div>
-      )}
-
-      {showBankModal && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,16,0.92)", display: "flex", alignItems: "flex-end", zIndex: 200, borderRadius: "inherit" }}>
-          <div style={{ width: "100%", background: "#13132a", borderRadius: "24px 24px 0 0", padding: "24px 20px 36px", border: "1px solid #1e1e3a" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-              <div style={{ color: "#fff", fontSize: "16px", fontWeight: 800 }}>Connect Your Bank</div>
-              <button onClick={() => setShowBankModal(false)} style={{ background: "none", border: "none", color: "#ffffff55", fontSize: "20px", cursor: "pointer" }}>×</button>
-            </div>
-            <div style={{ color: "#ffffff44", fontSize: "11px", marginBottom: "4px" }}>🔒 256-bit encrypted · your credentials are never stored</div>
-            <div style={{ color: "#4ade8066", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", marginBottom: "16px" }}>Powered by Plaid</div>
-            {["Chase Bank", "Bank of America", "Wells Fargo", "Capital One", "Other Bank"].map((bank) => (
-              <button key={bank} onClick={() => connectBank(bank)} style={{ width: "100%", padding: "14px 16px", borderRadius: "14px", marginBottom: "8px", background: "#0d0d1a", border: "1px solid #1e1e3a", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "'Syne', sans-serif", textAlign: "left", display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "20px" }}>🏦</span> {bank}
-              </button>
+          <div style={{ ...S.card, padding: "4px 14px" }}>
+            {visible.map((t) => (
+              <div key={t.id} className="ss-row" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 0", borderBottom: "1px solid #1e1e3a" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "#fff", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                  <div style={{ color: "#ffffff44", fontSize: "10px" }}>{new Date(t.date).toLocaleDateString("default", { month: "short", day: "numeric" })} · {t.category}{t.source === "demo" && " · demo"}</div>
+                </div>
+                <div style={{ color: "#ffffffbb", fontSize: "12px", fontWeight: 600 }}>-{money(t.amount)}</div>
+                <button onClick={() => onRemovePurchase(t.id)} aria-label={`Remove ${t.name}`} style={{ background: "none", border: "none", color: "#ffffff33", cursor: "pointer", fontSize: "14px", padding: "0 2px" }}>×</button>
+              </div>
             ))}
           </div>
         </div>
       )}
+
+      {showAddPurchase && <AddPurchaseModal categories={categories} onAdd={onAddPurchase} onClose={() => setShowAddPurchase(false)} />}
     </div>
   );
 }
@@ -1159,19 +1007,29 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync, syncedTransac
 // -------------------------------------------------------------------
 const COACH_GREETING = { role: "assistant", text: "Hey! I'm your StudentSteals AI coach 👋 I can see your budget and spending, so ask me where your money's going or how to save this week." };
 
+let nextTxId = 1;
+
 export default function DormDeal() {
   const [tab, setTab] = useState("deals");
   const [screen, setScreen] = useState("main");
   const [userName, setUserName] = useState(null);
   const [budgets, setBudgets] = useState(null);
-  const [spending, setSpending] = useState({});
   const [transactions, setTransactions] = useState([]);
+  const [insights, setInsights] = useState(null);
   const [messages, setMessages] = useState([COACH_GREETING]);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [deals, setDeals] = useState([]);
   const [dealsLoading, setDealsLoading] = useState(false);
   const [dealsError, setDealsError] = useState(null);
   const [origin, setOrigin] = useState(null);
+
+  // Spending is always derived from the transaction list
+  const spending = useMemo(() => {
+    const totals = {};
+    Object.keys(budgets || {}).forEach((k) => { totals[k] = 0; });
+    transactions.forEach(({ category, amount }) => { totals[category] = (totals[category] || 0) + amount; });
+    return totals;
+  }, [budgets, transactions]);
 
   const findDeals = useCallback(() => {
     if (!navigator.geolocation) { setDealsError("Your browser doesn't support location."); return; }
@@ -1196,26 +1054,15 @@ export default function DormDeal() {
     );
   }, []);
 
+  const addTransactions = (items) => {
+    const now = new Date().toISOString();
+    setTransactions((prev) => [...prev, ...items.map((t) => ({ date: now, source: "manual", ...t, id: nextTxId++ }))]);
+  };
+
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
-    const init = {};
-    Object.keys(budgetMap).forEach((k) => { init[k] = 0; });
-    setSpending(init);
-  };
-
-  const handleAddPurchase = (category, amount) => {
-    setSpending((prev) => ({ ...prev, [category]: (prev[category] || 0) + amount }));
-  };
-
-  // Called after bank sync — merges AI-categorized totals into spending
-  const handleBankSync = (totals) => {
-    setSpending((prev) => {
-      const merged = { ...prev };
-      Object.entries(totals).forEach(([cat, amt]) => {
-        merged[cat] = (merged[cat] || 0) + amt;
-      });
-      return merged;
-    });
+    // Re-file purchases whose category no longer exists
+    setTransactions((prev) => prev.map((t) => (t.category in budgetMap ? t : { ...t, category: "Other" })));
   };
 
   const hour = new Date().getHours();
@@ -1276,10 +1123,12 @@ export default function DormDeal() {
                 <BudgetTab
                   budgets={budgets}
                   spending={spending}
-                  onAddPurchase={handleAddPurchase}
-                  onBankSync={handleBankSync}
-                  syncedTransactions={transactions}
-                  setSyncedTransactions={setTransactions}
+                  transactions={transactions}
+                  onAddPurchase={(t) => addTransactions([t])}
+                  onRemovePurchase={(id) => setTransactions((prev) => prev.filter((t) => t.id !== id))}
+                  onLoadDemo={addTransactions}
+                  insights={insights}
+                  setInsights={setInsights}
                 />
               )}
             </div>
