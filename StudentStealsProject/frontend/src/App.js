@@ -292,28 +292,30 @@ function NamePrompt({ onDone }) {
   const [name, setName] = useState("");
   return (
     <div style={S.overlay}>
-      <div style={{ fontSize: "40px", marginBottom: "16px" }}>🎓</div>
-      <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px", marginBottom: "6px" }}>WELCOME TO</div>
-      <div style={{ color: "#fff", fontSize: "24px", fontWeight: 800, marginBottom: "6px" }}>
-        Student<span style={{ color: "#4ade80" }}>Steals</span>
+      <div className="ss-fade" style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ ...S.avatar(72), marginBottom: "18px", boxShadow: "0 0 40px rgba(74,222,128,0.35)" }}>🎓</div>
+        <div style={{ ...S.label, letterSpacing: "2px", marginBottom: "6px" }}>WELCOME TO</div>
+        <div style={{ color: "#fff", fontSize: "28px", fontWeight: 800, marginBottom: "6px" }}>
+          Student<span style={{ color: "#4ade80" }}>Steals</span>
+        </div>
+        <div style={{ color: "#ffffff66", fontSize: "13px", marginBottom: "32px", textAlign: "center", lineHeight: 1.5 }}>
+          Nearby deals and an AI money coach,<br />built for a student budget.
+        </div>
+        <div style={{ width: "100%", marginBottom: "10px" }}>
+          <div style={{ color: "#ffffff88", fontSize: "11px", fontWeight: 700, letterSpacing: "1px", marginBottom: "8px" }}>WHAT'S YOUR NAME?</div>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && name.trim() && onDone(name.trim())}
+            placeholder="Enter your first name..."
+            style={S.input}
+          />
+        </div>
+        <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} style={{ ...S.btn, opacity: name.trim() ? 1 : 0.4, marginTop: "4px" }}>
+          Let's Go →
+        </button>
       </div>
-      <div style={{ color: "#ffffff55", fontSize: "12px", marginBottom: "28px", textAlign: "center" }}>
-        Your AI-powered student money coach
-      </div>
-      <div style={{ width: "100%", marginBottom: "10px" }}>
-        <div style={{ color: "#ffffff88", fontSize: "11px", fontWeight: 700, letterSpacing: "1px", marginBottom: "8px" }}>WHAT'S YOUR NAME?</div>
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && name.trim() && onDone(name.trim())}
-          placeholder="Enter your first name..."
-          style={S.input}
-        />
-      </div>
-      <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} style={{ ...S.btn, opacity: name.trim() ? 1 : 0.4, marginTop: "4px" }}>
-        Let's Go →
-      </button>
     </div>
   );
 }
@@ -597,70 +599,60 @@ function MapNotice({ icon, text, sub, error }) {
 // -------------------------------------------------------------------
 // PROFILE SCREEN
 // -------------------------------------------------------------------
-function ProfileScreen({ userName }) {
+function ProfileScreen({ userName, onRename, budgets, spending, transactions, deals, onEditBudget, onClearTransactions, onReset }) {
   const [editingName, setEditingName] = useState(false);
-  const [displayName, setDisplayName] = useState(userName || "Student");
-  const [tempName, setTempName] = useState(userName || "Student");
-  const [notifications, setNotifications] = useState(true);
-  const [locationSharing, setLocationSharing] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+  const [tempName, setTempName] = useState(userName || "");
 
-  const ToggleSwitch = ({ value, onChange }) => (
-    <div onClick={() => onChange(!value)} style={{ width: "44px", height: "24px", borderRadius: "100px", background: value ? "#4ade80" : "#1e1e3a", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
-      <div style={{ position: "absolute", top: "3px", left: value ? "23px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
-    </div>
-  );
+  const totalBudget = budgets ? Object.values(budgets).reduce((a, b) => a + b, 0) : 0;
+  const totalSpent = Object.values(spending).reduce((a, b) => a + b, 0);
+  const stats = [
+    ["Monthly budget", budgets ? money(totalBudget) : "Not set"],
+    ["Spent so far", money(totalSpent)],
+    ["Transactions", transactions.length],
+    ["Deals found", deals.length],
+  ];
 
-  const SettingRow = ({ icon, label, sublabel, children }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 0", borderBottom: "1px solid #1e1e3a" }}>
-      <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#13132a", border: "1px solid #1e1e3a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ color: "#fff", fontSize: "13px", fontWeight: 600 }}>{label}</div>
-        {sublabel && <div style={{ color: "#ffffff44", fontSize: "11px", marginTop: "1px" }}>{sublabel}</div>}
-      </div>
-      {children}
-    </div>
-  );
+  const saveName = () => { if (tempName.trim()) { onRename(tempName.trim()); setEditingName(false); } };
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none" }}>
-      <div style={{ padding: "16px 20px 80px" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
-          <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", marginBottom: "12px", boxShadow: "0 0 0 3px #0d0d1a, 0 0 0 5px #4ade8044" }}>🎓</div>
+    <div className="ss-scroll" style={S.scrollArea}>
+      <div style={{ padding: "8px 20px 24px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "22px" }}>
+          <div style={{ ...S.avatar(72), fontSize: "30px", fontWeight: 800, color: "#080810", marginBottom: "12px", boxShadow: "0 0 0 3px #0d0d1a, 0 0 0 5px #4ade8044" }}>
+            {(userName || "?").charAt(0).toUpperCase()}
+          </div>
           {editingName ? (
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ ...S.input, width: "140px", textAlign: "center", fontSize: "16px", fontWeight: 700 }} autoFocus />
-              <button onClick={() => { setDisplayName(tempName); setEditingName(false); }} style={{ background: "#4ade80", border: "none", borderRadius: "8px", padding: "8px 12px", color: "#080810", fontWeight: 700, cursor: "pointer", fontSize: "12px", fontFamily: "'Syne', sans-serif" }}>Save</button>
+              <input value={tempName} onChange={(e) => setTempName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} style={{ ...S.input, width: "150px", textAlign: "center", fontSize: "16px", fontWeight: 700 }} autoFocus />
+              <button onClick={saveName} style={{ background: "#4ade80", border: "none", borderRadius: "8px", padding: "9px 12px", color: "#080810", fontWeight: 700, cursor: "pointer", fontSize: "12px", fontFamily: "inherit" }}>Save</button>
             </div>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>{displayName}</div>
-              <button onClick={() => { setTempName(displayName); setEditingName(true); }} style={{ background: "none", border: "none", color: "#4ade8088", fontSize: "12px", cursor: "pointer" }}>✏️</button>
-            </div>
+            <button onClick={() => { setTempName(userName || ""); setEditingName(true); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", color: "#fff", fontSize: "20px", fontWeight: 800 }}>
+              {userName} <span style={{ fontSize: "12px", color: "#4ade8099" }}>✏️</span>
+            </button>
           )}
-          <div style={{ color: "#4ade8088", fontSize: "11px", marginTop: "4px", fontFamily: "monospace" }}>student@university.edu</div>
         </div>
-        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ACCOUNT</div>
-        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
-          <SettingRow icon="🔒" label="Change Password" sublabel="Last changed 30 days ago"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
-          <SettingRow icon="📧" label="Change Email" sublabel="student@university.edu"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
-          <SettingRow icon="🎓" label="University" sublabel="Not set"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
+
+        <div style={{ ...S.label, marginBottom: "8px" }}>THIS MONTH</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "20px" }}>
+          {stats.map(([label, value]) => (
+            <div key={label} style={{ ...S.card, marginBottom: 0 }}>
+              <div style={{ ...S.muted, fontSize: "10px" }}>{label}</div>
+              <div style={{ color: "#fff", fontSize: "18px", fontWeight: 800, marginTop: "2px" }}>{value}</div>
+            </div>
+          ))}
         </div>
-        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>PREFERENCES</div>
-        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
-          <SettingRow icon="🔔" label="Deal Notifications" sublabel="Get alerted on new nearby deals"><ToggleSwitch value={notifications} onChange={setNotifications} /></SettingRow>
-          <SettingRow icon="📍" label="Location Sharing" sublabel="Needed for nearby deals"><ToggleSwitch value={locationSharing} onChange={setLocationSharing} /></SettingRow>
-          <SettingRow icon="🌙" label="Dark Mode" sublabel="Always on (recommended)"><ToggleSwitch value={darkMode} onChange={setDarkMode} /></SettingRow>
+
+        <div style={{ ...S.label, marginBottom: "8px" }}>MANAGE</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+          <button onClick={onEditBudget} style={{ ...S.ghostBtn, textAlign: "left" }}>📊 {budgets ? "Edit budget" : "Set up budget"}</button>
+          <button onClick={onClearTransactions} disabled={!transactions.length} style={{ ...S.ghostBtn, textAlign: "left", opacity: transactions.length ? 1 : 0.4 }}>🧾 Clear transactions</button>
+          <button onClick={onReset} style={{ ...S.ghostBtn, textAlign: "left", color: "#f87171", background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)" }}>↺ Start over</button>
         </div>
-        <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", marginBottom: "4px" }}>ABOUT</div>
-        <div style={{ background: "#13132a", borderRadius: "16px", padding: "0 14px", border: "1px solid #1e1e3a", marginBottom: "16px" }}>
-          <SettingRow icon="ℹ️" label="App Version" sublabel="v1.0.0 — StudentSteals"><div style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700 }}>Latest</div></SettingRow>
-          <SettingRow icon="⭐" label="Rate the App" sublabel="Help us improve"><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
-          <SettingRow icon="💬" label="Send Feedback" sublabel=""><div style={{ color: "#ffffff33", fontSize: "18px" }}>›</div></SettingRow>
+
+        <div style={{ textAlign: "center", ...S.muted, fontSize: "10px", lineHeight: 1.6 }}>
+          StudentSteals · Built at HackCU 12<br />Deals from Google Places · AI by Google Gemini
         </div>
-        <button style={{ width: "100%", padding: "14px", borderRadius: "14px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>
-          Sign Out
-        </button>
       </div>
     </div>
   );
@@ -1009,11 +1001,12 @@ const COACH_GREETING = { role: "assistant", text: "Hey! I'm your StudentSteals A
 
 let nextTxId = 1;
 
-export default function DormDeal() {
+export default function StudentSteals() {
   const [tab, setTab] = useState("deals");
   const [screen, setScreen] = useState("main");
   const [userName, setUserName] = useState(null);
   const [budgets, setBudgets] = useState(null);
+  const [editingBudget, setEditingBudget] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [insights, setInsights] = useState(null);
   const [messages, setMessages] = useState([COACH_GREETING]);
@@ -1061,12 +1054,29 @@ export default function DormDeal() {
 
   const handleBudgetDone = (budgetMap) => {
     setBudgets(budgetMap);
+    setEditingBudget(false);
     // Re-file purchases whose category no longer exists
     setTransactions((prev) => prev.map((t) => (t.category in budgetMap ? t : { ...t, category: "Other" })));
   };
 
+  const resetAll = () => {
+    setUserName(null); setBudgets(null); setTransactions([]); setInsights(null); setMessages([COACH_GREETING]);
+    setDeals([]); setOrigin(null); setSelectedDeal(null); setTab("deals"); setScreen("main");
+  };
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "GOOD MORNING" : hour < 17 ? "GOOD AFTERNOON" : "GOOD EVENING";
+  const needsBudget = userName && ((tab === "budget" && screen === "main" && !budgets) || editingBudget);
+
+  const navItem = (key, icon, label) => {
+    const active = screen === key;
+    return (
+      <button onClick={() => setScreen(key)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", fontFamily: "inherit" }}>
+        <div style={{ width: "44px", height: "40px", borderRadius: "14px", background: active ? "rgba(74,222,128,0.15)" : "transparent", border: `1px solid ${active ? "rgba(74,222,128,0.3)" : "transparent"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "19px", transition: "all 0.2s" }}>{icon}</div>
+        <div style={{ color: active ? "#4ade80" : "#ffffff44", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>{label}</div>
+      </button>
+    );
+  };
 
   return (
     <div className="ss-stage">
@@ -1089,12 +1099,22 @@ export default function DormDeal() {
         )}
 
         {screen === "profile" && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ padding: "12px 20px 8px", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-              <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px" }}>YOUR</div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ padding: "14px 20px 8px", flexShrink: 0 }}>
+              <div style={S.label}>YOUR</div>
               <div style={{ color: "#fff", fontSize: "20px", fontWeight: 800 }}>Profile</div>
             </div>
-            <ProfileScreen userName={userName} />
+            <ProfileScreen
+              userName={userName}
+              onRename={setUserName}
+              budgets={budgets}
+              spending={spending}
+              transactions={transactions}
+              deals={deals}
+              onEditBudget={() => setEditingBudget(true)}
+              onClearTransactions={() => { setTransactions([]); setInsights(null); }}
+              onReset={resetAll}
+            />
           </div>
         )}
 
@@ -1106,7 +1126,9 @@ export default function DormDeal() {
                   <div style={{ color: "#4ade80", fontSize: "10px", fontWeight: 700, letterSpacing: "2px" }}>{greeting}</div>
                   <div style={{ color: "#fff", fontSize: "22px", fontWeight: 800 }}>{userName ? `${userName} 👋` : "Welcome 👋"}</div>
                 </div>
-                <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
+                <button onClick={() => setScreen("profile")} aria-label="Profile" style={{ ...S.avatar(42), border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 800, color: "#080810", fontFamily: "inherit" }}>
+                  {userName ? userName.charAt(0).toUpperCase() : "🎓"}
+                </button>
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
                 {[["deals", "🔥 Steals"], ["coach", "🤖 Coach"], ["budget", "📊 Budget"]].map(([key, label]) => (
@@ -1117,7 +1139,7 @@ export default function DormDeal() {
             {tab === "coach" ? (
               <CoachTab messages={messages} setMessages={setMessages} budgets={budgets} spending={spending} transactions={transactions} deals={deals} origin={origin} />
             ) : (
-            <div style={S.scrollArea}>
+            <div className="ss-scroll" style={S.scrollArea}>
               {tab === "deals" && <DealsTab deals={deals} loading={dealsLoading} error={dealsError} origin={origin} onFindDeals={findDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
               {tab === "budget" && budgets && (
                 <BudgetTab
@@ -1137,24 +1159,18 @@ export default function DormDeal() {
         )}
 
         {/* Bottom Nav */}
-        <div style={{ display: "flex", alignItems: "center", padding: "10px 20px 18px", background: "#0d0d1a", borderTop: "1px solid #1a1a2e", flexShrink: 0 }}>
-          <div onClick={() => setScreen("map")} style={{ flex: 1, textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-            <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: screen === "map" ? "rgba(74,222,128,0.15)" : "transparent", border: screen === "map" ? "1px solid rgba(74,222,128,0.3)" : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", transition: "all 0.2s" }}>🗺️</div>
-            <div style={{ color: screen === "map" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Map</div>
-          </div>
-          <div onClick={() => setScreen("main")} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: "pointer", marginTop: "-18px" }}>
+        <nav style={{ display: "flex", alignItems: "center", padding: "8px 20px 14px", background: "#0d0d1a", borderTop: "1px solid #1a1a2e", flexShrink: 0 }}>
+          {navItem("map", "🗺️", "Map")}
+          <button onClick={() => setScreen("main")} style={{ flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: "pointer", marginTop: "-18px", fontFamily: "inherit" }}>
             <div style={{ width: "56px", height: "56px", borderRadius: "18px", background: screen === "main" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", border: screen === "main" ? "none" : "1px solid #2a2a4a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: screen === "main" ? "0 4px 20px rgba(74,222,128,0.4)" : "0 4px 12px rgba(0,0,0,0.4)", transition: "all 0.2s" }}>🏠</div>
-            <div style={{ color: screen === "main" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Home</div>
-          </div>
-          <div onClick={() => setScreen("profile")} style={{ flex: 1, textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-            <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: screen === "profile" ? "rgba(74,222,128,0.15)" : "transparent", border: screen === "profile" ? "1px solid rgba(74,222,128,0.3)" : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", transition: "all 0.2s" }}>👤</div>
-            <div style={{ color: screen === "profile" ? "#4ade80" : "#ffffff33", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Profile</div>
-          </div>
-        </div>
+            <div style={{ color: screen === "main" ? "#4ade80" : "#ffffff44", fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px" }}>Home</div>
+          </button>
+          {navItem("profile", "👤", "Profile")}
+        </nav>
 
         {/* Overlays */}
-        {!userName && <NamePrompt onDone={(name) => setUserName(name)} />}
-        {userName && tab === "budget" && screen === "main" && !budgets && <BudgetSetup onDone={handleBudgetDone} />}
+        {!userName && <NamePrompt onDone={setUserName} />}
+        {needsBudget && <BudgetSetup initial={budgets} onDone={handleBudgetDone} onCancel={budgets ? () => setEditingBudget(false) : null} />}
       </div>
     </div>
   );
