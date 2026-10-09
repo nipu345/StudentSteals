@@ -15,20 +15,26 @@ app = Flask(__name__)
 CORS(app)
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-3.8-flash"
 model = genai.GenerativeModel(MODEL_NAME)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"  # Places API (New)
+FIELD_MASK = ",".join([
+    "places.id", "places.displayName", "places.location", "places.types", "places.rating",
+    "places.priceLevel", "places.currentOpeningHours.openNow", "places.shortFormattedAddress", "places.businessStatus",
+])
+PRICE_LEVELS = {"PRICE_LEVEL_FREE": 0, "PRICE_LEVEL_INEXPENSIVE": 1, "PRICE_LEVEL_MODERATE": 2,
+                "PRICE_LEVEL_EXPENSIVE": 3, "PRICE_LEVEL_VERY_EXPENSIVE": 4}
 
-# Nearby Search only accepts one `type` per request, so we search each of
-# these separately and merge the results. Value = (deal category, emoji).
+# Nearby Search returns at most 20 places per request, so we search each of
+# these types separately and merge the results. Value = (deal category, emoji).
 DEAL_TYPES = {
     "restaurant": ("food", "🍽️"),
     "cafe": ("coffee", "☕"),
     "bakery": ("food", "🥐"),
     "meal_takeaway": ("food", "🥡"),
-    "grocery_or_supermarket": ("groceries", "🛒"),
+    "grocery_store": ("groceries", "🛒"),
     "book_store": ("books", "📚"),
     "gym": ("fitness", "💪"),
     "movie_theater": ("entertainment", "🎬"),
@@ -49,14 +55,35 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 
 def search_type(lat, lng, radius, place_type):
-    params = {"location": f"{lat},{lng}", "radius": radius, "type": place_type, "key": GOOGLE_API_KEY}
+    body = {
+        "includedTypes": [place_type],
+        "maxResultCount": 20,
+        "rankPreference": "DISTANCE",
+        "locationRestriction": {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": float(radius)}},
+    }
+    headers = {"X-Goog-Api-Key": GOOGLE_API_KEY, "X-Goog-FieldMask": FIELD_MASK}
     try:
-        resp = requests.get(NEARBY_URL, params=params, timeout=8).json()
+        resp = requests.post(NEARBY_URL, json=body, headers=headers, timeout=8).json()
     except requests.RequestException:
-        resp = requests.get(NEARBY_URL, params=params, timeout=8).json()  # one retry
-    if resp.get("status") not in ["OK", "ZERO_RESULTS"]:
-        raise RuntimeError(f"Google Places error: {resp.get('status')}")
-    return place_type, resp.get("results", [])
+        resp = requests.post(NEARBY_URL, json=body, headers=headers, timeout=8).json()  # one retry
+    if "error" in resp:
+        raise RuntimeError(f"Google Places error: {resp['error'].get('status')} {resp['error'].get('message', '')}")
+    return place_type, [normalize_place(p) for p in resp.get("places", [])]
+
+
+def normalize_place(p):
+    """Convert a Places API (New) result to the field names the rest of this file uses."""
+    return {
+        "place_id": p["id"],
+        "name": p.get("displayName", {}).get("text"),
+        "geometry": {"location": {"lat": p["location"]["latitude"], "lng": p["location"]["longitude"]}},
+        "types": p.get("types", []),
+        "rating": p.get("rating"),
+        "price_level": PRICE_LEVELS.get(p.get("priceLevel")),
+        "opening_hours": {"open_now": p.get("currentOpeningHours", {}).get("openNow")},
+        "vicinity": p.get("shortFormattedAddress"),
+        "business_status": p.get("businessStatus", "OPERATIONAL"),
+    }
 
 
 def search_nearby(lat, lng, radius, place_types):
@@ -221,7 +248,7 @@ def ai_coach():
     nearby = data.get("nearby") or []
     if not nearby and data.get("lat") is not None and data.get("lng") is not None:
         try:
-            found = search_nearby(data["lat"], data["lng"], 1000, ["restaurant", "grocery_or_supermarket"])[:8]
+            found = search_nearby(data["lat"], data["lng"], 1000, ["restaurant", "grocery_store"])[:8]
             nearby = [{"name": p.get("name"), "rating": p.get("rating")} for p, _ in found]
         except Exception:
             nearby = []
