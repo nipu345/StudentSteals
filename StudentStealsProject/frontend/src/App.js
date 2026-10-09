@@ -17,6 +17,8 @@ const categoryMeta = (c) => CATEGORY_META[c] || { label: c.charAt(0).toUpperCase
 
 const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
+const money = (n) => `$${n.toFixed(2)}`;
+
 // Turns "Failed to fetch" into something a person can act on
 function friendlyError(e) {
   if (e instanceof TypeError) return "Can't reach the StudentSteals server. Is app.py running on port 8080?";
@@ -191,7 +193,7 @@ function categorizeAllAtOnce(purchases, userCategories) {
 // STYLES
 // -------------------------------------------------------------------
 const S = {
-  scrollArea: { flex: 1, overflowY: "auto", scrollbarWidth: "none" },
+  scrollArea: { flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "none" },
   card: {
     background: "#13132a",
     borderRadius: "18px",
@@ -254,6 +256,7 @@ const S = {
     width: "100%",
     boxSizing: "border-box",
   },
+  avatar: (size) => ({ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size / 2, flexShrink: 0 }),
   overlay: {
     position: "absolute",
     inset: 0,
@@ -806,69 +809,79 @@ function DealsTab({ deals, loading, error, origin, onFindDeals, onDealClick }) {
 // -------------------------------------------------------------------
 // AI COACH TAB
 // -------------------------------------------------------------------
-function CoachTab({ spending }) {
-  const [messages, setMessages] = useState([{ role: "assistant", text: "Hey! I'm your StudentSteals AI coach 👋 Ask me anything about saving money as a student." }]);
+function CoachTab({ messages, setMessages, budgets, spending, transactions, deals, origin }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg = input.trim();
+  const totalSpent = Object.values(spending).reduce((a, b) => a + b, 0);
+  const hasData = transactions.length > 0 || totalSpent > 0;
+
+  const sendMessage = async (text) => {
+    const userMsg = (text ?? input).trim();
+    if (!userMsg || loading) return;
+    const history = [...messages.filter((m) => !m.error), { role: "user", text: userMsg }];
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
     try {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending, lat: pos.coords.latitude, lng: pos.coords.longitude }) });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
-        setLoading(false);
-      }, async () => {
-        const res = await fetch(`${BACKEND_URL}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: userMsg, spending }) });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
-        setLoading(false);
+      const data = await postJSON("/coach", {
+        messages: history,
+        budgets: budgets || {},
+        spending,
+        transactions,
+        nearby: deals.slice(0, 10).map((d) => ({ name: d.name, rating: d.rating })),
+        ...(origin || {}),
       });
+      setMessages((prev) => [...prev, { role: "assistant", text: data.response }]);
     } catch (e) {
-      setMessages((prev) => [...prev, { role: "assistant", text: `Sorry, something went wrong: ${e.message}` }]);
+      setMessages((prev) => [...prev, { role: "assistant", text: `Sorry, I couldn't answer that. ${friendlyError(e)}`, error: true }]);
+    } finally {
       setLoading(false);
     }
   };
 
-  const suggestions = ["I have $30 left this week 😬", "How do I save on textbooks?", "Best cheap meals near campus?", "Help me stick to my budget"];
+  const suggestions = hasData
+    ? ["Where is my money going?", "Which budget am I most likely to blow?", "Cheap dinner ideas near me?", "Plan my spending for next week"]
+    : ["I have $30 left this week 😬", "How do I save on textbooks?", "Best cheap meals near campus?", "Help me make a budget"];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "0 20px" }}>
-      <div style={{ flex: 1, overflowY: "auto", scrollbarWidth: "none", paddingBottom: "12px" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, padding: "0 20px" }}>
+      <div style={{ ...S.card, padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: hasData ? "#86efac" : "#ffffff77", flexShrink: 0 }}>
+        <span>{hasData ? "📈" : "💡"}</span>
+        <span>{hasData
+          ? `Coach can see your budget and ${money(totalSpent)} of spending${transactions.length ? ` across ${transactions.length} purchases` : ""}`
+          : "Add purchases on the Budget tab so the coach can analyze your spending"}</span>
+      </div>
+      <div className="ss-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: "12px" }}>
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: "10px" }}>
-            {msg.role === "assistant" && <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", marginRight: "8px", flexShrink: 0, marginTop: "2px" }}>🤖</div>}
-            <div style={{ maxWidth: "75%", background: msg.role === "user" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", color: msg.role === "user" ? "#080810" : "#e2e8f0", borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", padding: "10px 14px", fontSize: "13px", lineHeight: 1.6, border: msg.role === "assistant" ? "1px solid #1e1e3a" : "none" }}>
+          <div key={i} className="ss-fade" style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: "10px" }}>
+            {msg.role === "assistant" && <div style={{ ...S.avatar(28), marginRight: "8px", marginTop: "2px" }}>🤖</div>}
+            <div className={msg.role === "assistant" ? "ss-md" : undefined} style={{ maxWidth: "80%", background: msg.role === "user" ? "linear-gradient(135deg, #4ade80, #22c55e)" : "#13132a", color: msg.role === "user" ? "#080810" : msg.error ? "#fca5a5" : "#e2e8f0", fontWeight: msg.role === "user" ? 600 : 400, borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", padding: "10px 14px", fontSize: "13px", lineHeight: 1.55, border: msg.role === "assistant" ? "1px solid #1e1e3a" : "none" }}>
               {msg.role === "assistant" ? <ReactMarkdown>{msg.text}</ReactMarkdown> : msg.text}
             </div>
           </div>
         ))}
         {loading && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #4ade80, #22c55e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>🤖</div>
-            <div style={{ background: "#13132a", border: "1px solid #1e1e3a", borderRadius: "18px 18px 18px 4px", padding: "10px 16px", color: "#4ade80", fontSize: "13px" }}>typing...</div>
+            <div style={S.avatar(28)}>🤖</div>
+            <div style={{ background: "#13132a", border: "1px solid #1e1e3a", borderRadius: "18px 18px 18px 4px", padding: "12px 16px" }}>
+              <span className="ss-typing"><i /><i /><i /></span>
+            </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
       {messages.length === 1 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
-          {suggestions.map((s, i) => <button key={i} onClick={() => setInput(s)} style={{ ...S.pill(false), fontSize: "11px" }}>{s}</button>)}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+          {suggestions.map((s) => <button key={s} onClick={() => sendMessage(s)} style={S.pill(false)}>{s}</button>)}
         </div>
       )}
-      <div style={{ display: "flex", gap: "8px", paddingBottom: "8px" }}>
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder="Ask anything about money..." style={{ flex: 1, background: "#13132a", border: "1px solid #1e1e3a", borderRadius: "14px", padding: "11px 14px", color: "#fff", fontSize: "13px", fontFamily: "'Syne', sans-serif", outline: "none" }} />
-        <button onClick={sendMessage} disabled={loading} style={{ width: "44px", height: "44px", borderRadius: "14px", background: "linear-gradient(135deg, #4ade80, #22c55e)", border: "none", cursor: "pointer", fontSize: "18px", opacity: loading ? 0.5 : 1 }}>↑</button>
+      <div style={{ display: "flex", gap: "8px", paddingBottom: "10px", flexShrink: 0 }}>
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder="Ask anything about money..." style={{ ...S.input, flex: 1, background: "#13132a", borderRadius: "14px", padding: "12px 14px" }} />
+        <button onClick={() => sendMessage()} disabled={loading || !input.trim()} aria-label="Send" style={{ width: "44px", height: "44px", borderRadius: "14px", background: "linear-gradient(135deg, #4ade80, #22c55e)", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 800, color: "#080810", opacity: loading || !input.trim() ? 0.4 : 1, flexShrink: 0 }}>↑</button>
       </div>
     </div>
   );
@@ -877,7 +890,7 @@ function CoachTab({ spending }) {
 // -------------------------------------------------------------------
 // BUDGET TAB
 // -------------------------------------------------------------------
-function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
+function BudgetTab({ budgets, spending, onAddPurchase, onBankSync, syncedTransactions, setSyncedTransactions }) {
   const [insights, setInsights] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [showAddPurchase, setShowAddPurchase] = useState(false);
@@ -887,7 +900,6 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginStep, setLoginStep] = useState("form"); // "form" | "loading" | "syncing"
   const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "done"
-  const [syncedTransactions, setSyncedTransactions] = useState([]);
 
   // ── BANK SYNC WITH AI CATEGORIZATION ──────────────────────────────
   const connectBank = async (bankName) => {
@@ -1145,12 +1157,16 @@ function BudgetTab({ budgets, spending, onAddPurchase, onBankSync }) {
 // -------------------------------------------------------------------
 // MAIN APP
 // -------------------------------------------------------------------
+const COACH_GREETING = { role: "assistant", text: "Hey! I'm your StudentSteals AI coach 👋 I can see your budget and spending, so ask me where your money's going or how to save this week." };
+
 export default function DormDeal() {
   const [tab, setTab] = useState("deals");
   const [screen, setScreen] = useState("main");
   const [userName, setUserName] = useState(null);
   const [budgets, setBudgets] = useState(null);
   const [spending, setSpending] = useState({});
+  const [transactions, setTransactions] = useState([]);
+  const [messages, setMessages] = useState([COACH_GREETING]);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [deals, setDeals] = useState([]);
   const [dealsLoading, setDealsLoading] = useState(false);
@@ -1251,18 +1267,23 @@ export default function DormDeal() {
                 ))}
               </div>
             </div>
+            {tab === "coach" ? (
+              <CoachTab messages={messages} setMessages={setMessages} budgets={budgets} spending={spending} transactions={transactions} deals={deals} origin={origin} />
+            ) : (
             <div style={S.scrollArea}>
               {tab === "deals" && <DealsTab deals={deals} loading={dealsLoading} error={dealsError} origin={origin} onFindDeals={findDeals} onDealClick={(deal) => { setSelectedDeal(deal); setScreen("map"); }} />}
-              {tab === "coach" && <div style={{ display: "flex", flexDirection: "column", height: "100%" }}><CoachTab spending={spending} /></div>}
               {tab === "budget" && budgets && (
                 <BudgetTab
                   budgets={budgets}
                   spending={spending}
                   onAddPurchase={handleAddPurchase}
                   onBankSync={handleBankSync}
+                  syncedTransactions={transactions}
+                  setSyncedTransactions={setTransactions}
                 />
               )}
             </div>
+            )}
           </>
         )}
 
